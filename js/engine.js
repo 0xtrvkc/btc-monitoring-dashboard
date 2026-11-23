@@ -2,7 +2,7 @@
 // (scripts/check_engine.mjs) so every number can be checked headless.
 
 import {
-  HALVINGS, INDICATORS, COMPOSITE, TOP_WINDOW_DAYS, RANK_WINDOW_DAYS, RANK_MIN_DAYS,
+  HALVINGS, syncHalvings, INDICATORS, COMPOSITE, TOP_WINDOW_DAYS, RANK_WINDOW_DAYS, RANK_MIN_DAYS,
   ADAPTIVE_TOP, ADAPTIVE_BOTTOM, BT,
 } from './config.js';
 
@@ -135,6 +135,7 @@ export const cycleOf = (cycles, i) => { for (let j = cycles.length - 1; j >= 0; 
 export function buildModel(raw, latest = null) {
   const t0 = Date.now();
   const G = buildGrid(raw);
+  syncHalvings(latest?.halvings, G.dates[G.n - 1]);
   const cycles = buildCycles(G);
   const series = {}, heat = {};
   for (const ind of INDICATORS) {

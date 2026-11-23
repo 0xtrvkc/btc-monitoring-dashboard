@@ -27,6 +27,45 @@ const CHECKLISTS = ['peak-signals', 'bottom-signals'];
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// ── Halvings, read from the blockchain so new cycles start on the real date ──
+// Public Esplora APIs (same paths on both). Optional: if both fail, the
+// previous latest.json halvings are kept and the page falls back to config.js.
+const CHAINS = ['https://mempool.space/api', 'https://blockstream.info/api'];
+const HALVING_BLOCKS = 210000;
+
+async function chainGet(base, path, json = false) {
+  const res = await fetch(base + path, { headers: { 'User-Agent': UA } });
+  if (!res.ok) throw new Error(`${path} → HTTP ${res.status}`);
+  return json ? res.json() : (await res.text()).trim();
+}
+async function blockTime(base, height) {
+  const hash = await chainGet(base, `/block-height/${height}`);
+  if (!/^[0-9a-f]{64}$/.test(hash)) throw new Error(`bad hash for ${height}`);
+  const b = await chainGet(base, `/block/${hash}`, true);
+  if (!(b.timestamp > 1.2e9)) throw new Error(`bad timestamp for ${height}`);
+  return b.timestamp;
+}
+const utcDay = t => new Date(t * 1000).toISOString().slice(0, 10);
+
+export async function fetchHalvings() {
+  let lastErr;
+  for (const base of CHAINS) {
+    try {
+      const tip = Number(await chainGet(base, '/blocks/tip/height'));
+      if (!(tip > 800000)) throw new Error(`implausible tip ${tip}`);
+      const known = [];
+      for (let h = HALVING_BLOCKS; h <= tip; h += HALVING_BLOCKS) known.push({ height: h, date: utcDay(await blockTime(base, h)) });
+      // Next halving: remaining blocks × the average block time of the last ~2 weeks.
+      const span = 2016, tTip = await blockTime(base, tip), tOld = await blockTime(base, tip - span);
+      const secPerBlock = Math.min(Math.max((tTip - tOld) / span, 400), 800);
+      const nextH = (Math.floor(tip / HALVING_BLOCKS) + 1) * HALVING_BLOCKS;
+      const next = { height: nextH, blocksLeft: nextH - tip, estDate: utcDay(tTip + (nextH - tip) * secPerBlock), secPerBlock: Math.round(secPerBlock) };
+      return { source: base.replace(/^https:\/\/|\/api$/g, ''), tip, tipDate: utcDay(tTip), known, next };
+    } catch (e) { lastErr = e; console.warn(`halvings via ${base}: ${e.message}`); }
+  }
+  throw lastErr;
+}
+
 async function getJson(path, tries = 4) {
   let wait = 2000;
   for (let i = 1; i <= tries; i++) {
@@ -126,6 +165,13 @@ async function main() {
     for (const k of ['indicators', 'checklists']) {
       for (const [id, v] of Object.entries(oldLatest[k] || {})) if (!latest[k][id]) latest[k][id] = v;
     }
+  }
+  try {
+    latest.halvings = await fetchHalvings();
+    console.log(`halvings: tip ${latest.halvings.tip}, ${latest.halvings.known.map(h => h.date).join(', ')}; next ≈ ${latest.halvings.next.estDate} (${latest.halvings.next.blocksLeft} blocks)`);
+  } catch (e) {
+    if (oldLatest?.halvings) latest.halvings = oldLatest.halvings;
+    console.warn(`halvings: FAILED (${e.message}) — ${oldLatest?.halvings ? 'kept previous' : 'page uses config.js'}`);
   }
   await writeFile(new URL('latest.json', DATA_DIR), JSON.stringify(latest));
 

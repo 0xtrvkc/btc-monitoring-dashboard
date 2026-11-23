@@ -214,7 +214,7 @@ function sameDayTable(M, W) {
   return `<div class="tbl-wrap compact"><table><thead><tr><th>Cycle</th><th>Date</th><th class="n">× halving</th><th class="n">From top</th><th class="n">Heat</th></tr></thead><tbody>
     ${rows.map(r => `<tr><td><b style="color:${cycleColor(r.k)}">${cyc(r.k)}</b></td><td>${r.date}</td><td class="n">${r.multiple.toFixed(2)}×</td><td class="n">${pct(r.fromTop)}</td><td class="n"><span class="dot" style="display:inline-block;background:${heatColor(r.heat)};margin-right:6px"></span>${fin(r.heat) ? r.heat.toFixed(0) : '—'}</td></tr>`).join('')}
     <tr class="sel"><td><b style="color:${cycleColor(W.cycle.k)}">${cyc(W.cycle.k)} now</b></td><td>${W.date}</td><td class="n">${(W.price / W.cycle.halvingPrice).toFixed(2)}×</td><td class="n">${pct(fromTop)}</td><td class="n"><span class="dot" style="display:inline-block;background:${heatColor(W.heat)};margin-right:6px"></span>${W.heat.toFixed(0)}</td></tr>
-  </tbody></table></div><div class="note" style="margin-top:8px">C1's bottom was day ${M.cycles[1].bottom.i - M.cycles[1].start}, C2's ${M.cycles[2].bottom.i - M.cycles[2].start}, C3's ${M.cycles[3].bottom.i - M.cycles[3].start} after the halving.</div>`;
+  </tbody></table></div><div class="note" style="margin-top:8px">${M.cycles.filter(c => c.k >= 1 && c.bottom?.final).map(c => `${cyc(c.k)}'s bottom was day ${c.bottom.i - c.start}`).join(', ')} after the halving.</div>`;
 }
 
 function drawTiles(el, M) {

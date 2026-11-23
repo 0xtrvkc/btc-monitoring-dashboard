@@ -109,4 +109,9 @@ All indicator data: cointh.com Bitcoin Indicators API (https://cointh.com/api-do
 free for personal and commercial use with credit. No SLA — the daily snapshot keeps
 the site working when the API is down.
 
+Halving dates come from the blockchain (mempool.space, blockstream.info as backup),
+read by the same daily job into data/latest.json. When a halving happens the next
+cycle starts on its own; the following halving is estimated from recent block
+times. Nothing in the code needs editing for new cycles.
+
 Historical, descriptive analysis. Not financial advice.

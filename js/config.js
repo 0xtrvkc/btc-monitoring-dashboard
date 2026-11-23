@@ -4,7 +4,10 @@
 
 export const API_BASE = 'https://cointh.com/api/v1';
 
-// UTC dates of the halving blocks. The last one is an estimate.
+// UTC dates of the halving blocks. This is only the starting list: the daily
+// job reads the real halving blocks from the blockchain (data/latest.json →
+// halvings) and syncHalvings() below corrects/extends this array in place, so
+// new halvings and new cycles appear without editing code.
 export const HALVINGS = [
   { date: '2012-11-28', confirmed: true },
   { date: '2016-07-09', confirmed: true },
@@ -16,8 +19,34 @@ export const HALVINGS = [
 // Validated with the dataviz palette checker on the dark surface (adjacent pairs pass).
 // All-pairs deutan separation of C2/C4 is low, so cycles also carry a dash pattern
 // and direct labels; the live cycle is always the heaviest line.
-export const CYCLE_COLORS = { 0: '#8e8e93', 1: '#9085e9', 2: '#199e70', 3: '#c98500', 4: '#d55181', 5: '#3987e5' };
-export const CYCLE_DASH = { 0: [2, 3], 1: [2, 3], 2: [7, 4], 3: [12, 3, 2, 3], 4: [], 5: [] };
+export const CYCLE_COLORS = { 0: '#8e8e93', 1: '#9085e9', 2: '#199e70', 3: '#c98500', 4: '#d55181', 5: '#3987e5', 6: '#d95926' };
+export const CYCLE_DASH = { 0: [2, 3], 1: [2, 3], 2: [7, 4], 3: [12, 3, 2, 3], 4: [], 5: [], 6: [] };
+
+export const HALVING_BLOCKS = 210000;
+const HALVING_DAYS = 1458; // 210,000 blocks × 10 min — used only when nothing better is known
+
+const addDays = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10);
+
+// Bring HALVINGS up to date (mutates the shared array so every view sees it).
+//  info:     { known: [{ height, date }], next: { height, estDate } } from the daily job, or null
+//  lastDate: newest date in the data — there is always at least one halving after it,
+//            so the live cycle always has an end and a new cycle starts by itself.
+export function syncHalvings(info, lastDate) {
+  const put = (j, date, confirmed) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return;
+    while (HALVINGS.length < j) HALVINGS.push({ date: addDays(HALVINGS.at(-1).date, HALVING_DAYS), confirmed: false });
+    if (HALVINGS[j] && HALVINGS[j].confirmed && !confirmed) return; // never downgrade a real date
+    HALVINGS[j] = { date, confirmed };
+  };
+  for (const h of info?.known || []) put(h.height / HALVING_BLOCKS - 1, h.date, true);
+  if (info?.next) put(info.next.height / HALVING_BLOCKS - 1, info.next.estDate, false);
+  // Anything after a newly confirmed halving that was estimated from the old date: re-space it.
+  for (let j = 1; j < HALVINGS.length; j++) {
+    if (!HALVINGS[j].confirmed && HALVINGS[j].date <= HALVINGS[j - 1].date) HALVINGS[j] = { date: addDays(HALVINGS[j - 1].date, HALVING_DAYS), confirmed: false };
+  }
+  while (lastDate && HALVINGS.at(-1).date <= lastDate) HALVINGS.push({ date: addDays(HALVINGS.at(-1).date, HALVING_DAYS), confirmed: false });
+  return HALVINGS;
+}
 export const STATUS = { good: '#0ca30c', warning: '#fab219', serious: '#ec835a', critical: '#d03b3b' };
 
 // Cycle extremes use the same rule as the MVRV dashboard:

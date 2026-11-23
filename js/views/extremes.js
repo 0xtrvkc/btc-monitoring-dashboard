@@ -142,11 +142,12 @@ export function render(main, ctx) {
     return `<span class="chip ${ok ? 'good' : 'bad'}" data-tip="${esc(`<div class='th'>Error when predicting from earlier cycles</div>` + S.models.map(m => tipRow(MODELS[m].label, '±' + (fin(S.mae[m]) ? S.mae[m].toPrecision(2) : '—'))).join('') + tipRow('Naive (same as last)', '±' + S.mae.naive.toPrecision(2)) + tipRow('Cycles scored', S.scoredN))}">${ok ? MODELS[best].label + ' beats naive' : 'Naive wins'}</span>`;
   };
   const implied = S => { const p = S.models.map(m => S.implied[m]).filter(x => x > 0); return p.length ? usd(Math.min(...p), true) + '–' + usd(Math.max(...p), true) : '—'; };
+  const lastK = M.cycles.at(-1).k;
   main.innerHTML = `
   <div class="page-h"><div><h1>Cycle extremes</h1>
     <p>Each indicator's peak and bottom per halving cycle, fitted across cycles with linear, log and (for ratio indicators) exponential trends — and checked: every cycle is re-predicted from earlier cycles only and compared with the naive guess "same as last cycle". Open an indicator for its chart and zone days.</p></div></div>
   <div class="card"><div class="card-h"><h3>Peaks and bottoms by cycle</h3><span class="sub">* = not final · Lin / Log / Exp = projection by linear, log and exponential fit · hover a verdict for its errors</span></div>
-    <div class="tbl-wrap compact"><table><thead><tr><th>Indicator</th><th>▲ Peaks C1 → C4</th><th>Next peak (${cyc(rows[1].R.sides.peak.target)})</th><th>Peak fit</th><th class="bt-group">▼ Bottoms C1 → C4</th><th>${cyc(rows[1].R.sides.bottom.target)} bottom projection</th><th>≈ price today</th><th>Bottom fit</th></tr></thead><tbody>
+    <div class="tbl-wrap compact"><table><thead><tr><th>Indicator</th><th>▲ Peaks C1 → ${cyc(lastK)}</th><th>Next peak (${cyc(rows[1].R.sides.peak.target)})</th><th>Peak fit</th><th class="bt-group">▼ Bottoms C1 → ${cyc(lastK)}</th><th>${cyc(rows[1].R.sides.bottom.target)} bottom projection</th><th>≈ price today</th><th>Bottom fit</th></tr></thead><tbody>
     ${rows.map(({ ind, R }) => `<tr class="click" data-go="#/ind/${ind.id}"><td><b>${esc(ind.name)}</b></td><td>${seq(ind, R, 'peak')}</td><td>${proj(ind, R.sides.peak)}</td><td>${skill(R.sides.peak)}</td>
       <td class="bt-group">${seq(ind, R, 'bottom')}</td><td>${proj(ind, R.sides.bottom)}</td><td class="n">${implied(R.sides.bottom)}</td><td>${skill(R.sides.bottom)}</td></tr>`).join('')}
     </tbody></table></div>
