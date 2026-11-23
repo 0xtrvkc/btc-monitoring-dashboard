@@ -346,3 +346,19 @@ select.sel { height: 28px; border-radius: var(--r-sm); border: 1px solid var(--s
 .bt-matrix .grp-h.cold { color: var(--cold); }
 .bt-matrix .grp-h.hot { color: var(--hot); }
 .bt-matrix td, .bt-matrix th { padding-left: 7px; padding-right: 7px; }
+
+/* predictions */
+.pv-cons-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; margin-top: 4px; }
+.pv-cons .big { margin: 4px 0 6px; }
+.pv-cmp { grid-template-columns: minmax(0, 1fr) 440px; gap: 22px; align-items: start; }
+@media (max-width: 1700px) { .pv-cmp { grid-template-columns: minmax(0, 1fr); } .pv-cmp > div:last-child { max-width: 760px; } }
+.pv-low { align-items: start; }
+.pv-tbl-h { font-size: 12.5px; font-weight: 600; color: var(--text-2); margin: 2px 0 8px; }
+.pv-err { display: inline-block; min-width: 46px; padding: 2px 6px; border-radius: 6px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+.pv-tbl tr.pv-fam td { padding-top: 12px; font-size: 11.5px; font-weight: 600; color: var(--text-2); border-bottom: 0; }
+.pv-tbl tr.pv-base td:first-child { color: var(--muted); }
+.pv-tbl tr.pv-consrow td { background: var(--glass-3); }
+.pv-tbl td sup { color: var(--muted); }
+.pv-mini-h { font-size: 12px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pv-strip { display: flex; align-items: center; gap: 26px; flex-wrap: wrap; }
+.pv-strip-item { display: flex; align-items: baseline; gap: 10px; }

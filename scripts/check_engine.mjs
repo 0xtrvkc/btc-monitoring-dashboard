@@ -6,7 +6,7 @@ import { ALL_INDICATORS } from '../js/config.js';
 
 const dir = new URL('../data/', import.meta.url);
 const raw = {};
-for (const f of readdirSync(dir)) if (f.endsWith('.json') && f !== 'latest.json') raw[f.slice(0, -5)] = JSON.parse(readFileSync(new URL(f, dir)));
+for (const f of readdirSync(dir)) if (f.endsWith('.json') && f !== 'latest.json' && f !== 'forecasts.json') raw[f.slice(0, -5)] = JSON.parse(readFileSync(new URL(f, dir)));
 const M = buildModel(raw);
 console.log(`built in ${M.builtMs} ms, ${M.G.n} days, last ${M.G.dates[M.lastIdx]}`);
 for (const c of M.cycles) console.log(`C${c.k} ${c.startDate}  top ${c.top.date} $${Math.round(c.top.price)}${c.top.final ? '' : '?'}  bottom ${c.bottom?.date} $${Math.round(c.bottom?.price)}${c.bottom?.final ? '' : '?'}`);

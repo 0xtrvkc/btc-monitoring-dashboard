@@ -172,7 +172,7 @@ export function buildModel(raw, latest = null) {
   }
   series.heat = comp;
   heat.heat = comp; // the composite is already on a 0–100 heat scale
-  const M = { G, cycles, series, heat, compN, members, latest, fresh, builtMs: 0 };
+  const M = { G, cycles, series, heat, compN, members, latest, fresh, raw, builtMs: 0 };
   M.stale = INDICATORS.filter(x => fresh[x.id].stale);
   M.lastIdx = lastValid(G.price);
   M.backtest = {};

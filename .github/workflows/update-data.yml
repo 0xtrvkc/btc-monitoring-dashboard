@@ -32,6 +32,10 @@ jobs:
         env:
           HEALTH_OUT: ${{ runner.temp }}/btc-health.json
 
+      - name: Log today's prediction consensus
+        if: steps.fetch.outcome == 'success'
+        run: node scripts/log_forecast.mjs
+
       - name: Commit and push if data changed
         run: |
           git add data/

@@ -1,6 +1,7 @@
 import { INDICATORS, ALL_INDICATORS, byId } from './config.js';
 import { buildModel, whereAmI, heatLabel, classicZone, VERDICTS, dataHealth } from './engine.js';
 import { loadAll } from './data.js';
+import { computePredictions } from './predict.js';
 import { $, esc, fmtVal, usd, pct, heatColor, destroyCharts, hideTip, download, cyc } from './ui.js';
 import * as overview from './views/overview.js';
 import * as zones from './views/zones.js';
@@ -9,6 +10,7 @@ import * as clock from './views/clock.js';
 import * as overlayView from './views/overlay.js';
 import * as extremesView from './views/extremes.js';
 import * as backtest from './views/backtest.js';
+import * as predictView from './views/predict.js';
 import * as method from './views/method.js';
 import * as valuation from './views/valuation.js';
 import { computeValuation, VAL_SCHEMES, VAL_HYPOTHESIS, valZone } from './valuation.js';
@@ -20,9 +22,10 @@ const VIEWS = {
   overlay: { mod: overlayView, label: 'Cycle overlay', ico: '≋', key: '4' },
   clock: { mod: clock, label: 'Cycle clock', ico: '◷', key: '5' },
   extremes: { mod: extremesView, label: 'Cycle extremes', ico: '⤒', key: '6' },
-  backtest: { mod: backtest, label: 'Backtest', ico: '✓', key: '7' },
+  predict: { mod: predictView, label: 'Predictions', ico: '◬', key: '7' },
+  backtest: { mod: backtest, label: 'Backtest', ico: '✓', key: '8' },
   ind: { mod: indicator, label: 'Indicator', ico: '∿' },
-  method: { mod: method, label: 'Method & data', ico: 'ⓘ', key: '8' },
+  method: { mod: method, label: 'Method & data', ico: 'ⓘ', key: '9' },
 };
 
 const ctx = { M: null, W: null, issues: [], nav, rerender: () => route() };
@@ -70,7 +73,7 @@ function renderSidebar() {
   const item = (hash, ico, lbl, val = '', dot = null) =>
     `<button class="side-item" data-go="#/${hash}" ${cur === hash ? 'aria-current="page"' : ''}>${dot ? `<span class="dot" style="background:${dot}"></span>` : `<span class="ico">${ico}</span>`}<span class="lbl">${esc(lbl)}</span>${val ? `<span class="val">${val}</span>` : ''}</button>`;
   let h = `<div class="side-h">Monitor</div>`;
-  for (const k of ['where', 'valuation', 'zones', 'overlay', 'clock', 'extremes', 'backtest']) h += item(k, VIEWS[k].ico, VIEWS[k].label, `<kbd>${VIEWS[k].key}</kbd>`);
+  for (const k of ['where', 'valuation', 'zones', 'overlay', 'clock', 'extremes', 'predict', 'backtest']) h += item(k, VIEWS[k].ico, VIEWS[k].label, `<kbd>${VIEWS[k].key}</kbd>`);
   const groups = [...new Set(ALL_INDICATORS.map(x => x.group))];
   for (const g of groups) {
     h += `<div class="side-h">${esc(g)}</div>`;
@@ -161,6 +164,14 @@ function exportSummary() {
     line(`  ${ind.name.padEnd(28)} ${fmtVal(ind, v).padStart(8)}  pct ${Number.isFinite(h) ? h.toFixed(0).padStart(3) : '  —'}  ${(classicZone(ind, v) || '—').padEnd(6)}  ${ind.bottom ?? '—'} / ${ind.top ?? '—'}`);
   }
   line();
+  const PR = computePredictions(M), dd = j => new Date((M.G.first + j) * 864e5).toISOString().slice(0, 10);
+  line('PREDICTION CONSENSUS (median of all models; walk-forward tested on past cycles)');
+  for (const [side, F] of [['bottom', PR.now.bottom], ['top', PR.now.top]]) {
+    if (!F?.price) continue;
+    line(`  ${cyc(F.k)} ${side}${side === 'top' && F.future ? ' (early look)' : ''}: ${usd(F.price.v)}  middle half ${usd(F.price.lo)}–${usd(F.price.hi)}  · ${F.price.n} models${F.date ? `  · date ${dd(F.date.v)} (${dd(F.date.lo)} → ${dd(F.date.hi)})` : ''}${F.known && side === 'bottom' ? `  · low so far ${usd(F.known.p)} on ${M.G.dates[F.known.i]}` : ''}`);
+    const CS = PR.consScore[side + 'price']; line(`    same method on past cycles: ${CS.rows.filter(r => !r.na).map(r => `${cyc(r.k)} ${(r.err > 0 ? '+' : '') + (r.err * 100).toFixed(0)}%`).join(' · ') || '—'}`);
+  }
+  line();
   line('BACKTEST VERDICTS (walk-forward = thresholds fitted on earlier cycles only)');
   for (const ind of ALL_INDICATORS) {
     const b = M.backtest[ind.id];
@@ -176,10 +187,11 @@ function exportSummary() {
 async function boot(opts = {}) {
   $('#loading').hidden = false;
   try {
-    const { raw, latest, issues } = await loadAll((p, src) => { $('#loading-sub').textContent = `${Math.round(p * 100)}% · ${src}`; }, opts);
+    const { raw, latest, issues, forecasts } = await loadAll((p, src) => { $('#loading-sub').textContent = `${Math.round(p * 100)}% · ${src}`; }, opts);
     $('#loading-msg').textContent = 'Crunching cycles & backtests…';
     await new Promise(r => setTimeout(r, 20));
     ctx.M = buildModel(raw, latest);
+    ctx.M.forecastLog = Array.isArray(forecasts) ? forecasts : [];
     ctx.W = whereAmI(ctx.M);
     ctx.issues = issues;
     ctx.live = Object.values(raw).some(r => r.via === 'live');

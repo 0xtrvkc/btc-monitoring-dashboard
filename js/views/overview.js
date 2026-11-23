@@ -1,5 +1,6 @@
 import { INDICATORS, COMPOSITE } from '../config.js';
 import { heatLabel, impliedPrice, VERDICTS, namedZone } from '../engine.js';
+import { computePredictions } from '../predict.js';
 import {
   fin, esc, fmtVal, usd, pct, int, cyc, cycleColor, chip, heatbar, heatColor, sparkline, themeColors,
   timePanel, group, pts, cycleMarkers, tipRow, bindTips,
@@ -58,6 +59,7 @@ export function render(main, ctx) {
     </div>
     <div class="card"><div class="card-h"><h3>CoinTH checklists</h3><span class="sub">publisher's own thresholds</span></div><div id="checklists"></div></div>
   </div>
+  ${predStrip(M)}
 
   <div class="card mt"><div class="card-h"><h3>Price and cycle heat</h3><span class="sub">blue band = heat ≤ 10 (deep value), red = ≥ 90 · ▲ cycle tops, ▼ bottoms</span>
     <div class="right"><div class="seg" id="rng">${['All', '8Y', '4Y', '1Y'].map((r, j) => `<button data-r="${r}" aria-pressed="${j === 0}">${r}</button>`).join('')}</div></div></div>
@@ -273,4 +275,18 @@ function drawPriceHeat(M, from, to) {
     }],
     yTicksAt: [0, 10, 50, 90, 100], yTick: v => v,
   });
+}
+
+// One-line consensus from the Predictions page.
+function predStrip(M) {
+  let P; try { P = computePredictions(M); } catch (e) { console.error(e); return ''; }
+  const F = P.now.bottom, T = P.now.top, d = i => new Date((M.G.first + i) * 864e5).toISOString().slice(0, 10);
+  const part = (F, side) => {
+    if (!F?.price) return '';
+    const col = side === 'bottom' ? 'var(--cold)' : 'var(--hot)';
+    return `<div class="pv-strip-item"><span class="kicker" style="color:${col}">${side === 'bottom' ? '▼' : '▲'} ${cyc(F.k)} ${side}${side === 'top' && F.future ? ' · early look' : ''}</span>
+      <b class="num" style="font-size:18px">${usd(F.price.v, true)}</b><span class="note">${usd(F.price.lo, true)}–${usd(F.price.hi, true)}${F.date ? ` · ${d(F.date.lo)} → ${d(F.date.hi)}` : ''} · ${F.price.n} models${side === 'bottom' && F.known ? ` · low so far ${usd(F.known.p, true)}` : ''}</span></div>`;
+  };
+  return `<div class="card mt pv-strip"><div class="card-h" style="margin:0"><h3>Prediction consensus</h3><span class="sub">median of every model, tested walk-forward on past cycles</span></div>
+    ${part(F, 'bottom')}${part(T, 'top')}<button class="btn" data-go="#/predict" style="margin-left:auto">◬ Predictions →</button></div>`;
 }

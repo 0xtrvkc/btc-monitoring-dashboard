@@ -38,6 +38,8 @@ export async function loadAll(onProgress = () => {}, { live = false } = {}) {
   await Promise.all(Array.from({ length: live ? 3 : 6 }, async () => { while (queue.length) await one(queue.shift()); }));
   let latest = null;
   try { latest = await getJson('data/latest.json'); } catch { /* optional */ }
+  let forecasts = [];
+  try { forecasts = await getJson('data/forecasts.json'); } catch { /* starts empty */ }
   if (!raw.mayer && !raw.mvrv) throw new Error('No price data could be loaded. ' + issues.join('; '));
-  return { raw, latest, issues };
+  return { raw, latest, issues, forecasts };
 }

@@ -33,7 +33,7 @@ function report() {
 
   const ends = [];
   for (const f of readdirSync(DATA)) {
-    if (!f.endsWith('.json') || f === 'latest.json') continue;
+    if (!f.endsWith('.json') || f === 'latest.json' || f === 'forecasts.json') continue;
     try {
       const j = JSON.parse(readFileSync(new URL(f, DATA), 'utf8')), d = j.dates.slice(-9);
       const g = d.slice(1).map((x, k) => day(x) - day(d[k])).sort((a, b) => a - b);

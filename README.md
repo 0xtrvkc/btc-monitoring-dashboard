@@ -50,6 +50,14 @@ VIEWS
                      share of each cycle spent in the bottom / top zone. Indicator
                      pages get the full chart and a zone-days breakdown (named
                      zones, conventional lines or 4y percentile, with avg price).
+  Predictions        Price and date of each cycle's top and bottom from 39 models
+                     (cost-basis anchors, anchor trends, drawdown, diminishing
+                     returns, analog days, timing) plus naive baselines, every one
+                     scored walk-forward on past cycles. Headline = median of all
+                     models (no winner-picking). Overview chart of every forecast
+                     box vs the actual turn, model leaderboards, forest plot,
+                     day-by-day replay, and a live track record that the daily job
+                     appends to data/forecasts.json (never recomputed).
   Backtest           Every indicator × every completed top and bottom, four threshold
                      methods, a fit map (walk-forward vs hindsight) and a verdict:
                      Sharp · Correct · Overfit · Underfit (misses / loose), plus a
@@ -58,7 +66,7 @@ VIEWS
                      zone bands, conventional + fitted lines, cycle overlay, clock,
                      per-cycle table, backtest by method.
 
-  ⌘K jump anywhere · 1–8 views · [ ] previous / next indicator · ↓ Summary = text export.
+  ⌘K jump anywhere · 1–9 views · [ ] previous / next indicator · ↓ Summary = text export.
 
 
 TWO KINDS OF ZONE
