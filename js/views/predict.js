@@ -84,7 +84,7 @@ function overviewChart(M, P, canvas) {
   const C = themeColors(), G = M.G;
   const x0 = G.index('2016-01-01'), x1 = G.index('2030-12-31');
   const ann = {};
-  const tip = (html) => ({ enter: (c, e) => { showTip(e.native.clientX, e.native.clientY, html); }, leave: () => hideTip() });
+  const hits = []; // [{xa, xb, lo, hi, html}] — hit-tested on mousemove below
   const box = (key, side, k, F, actual, live) => {
     if (!F?.price) return;
     const col = side === 'bottom' ? C.cold : C.hot;
@@ -95,7 +95,8 @@ function overviewChart(M, P, canvas) {
       tipRow('Consensus', usd(F.price.v, true)) + tipRow('Middle half', `${usd(F.price.lo, true)}–${usd(F.price.hi, true)}`) +
       (F.date ? tipRow('Date', `${idxDate(M, F.date.v)} (${idxDate(M, F.date.lo)} → ${idxDate(M, F.date.hi)})`) : '') +
       (actual ? tipRow('Actual', `${usd(actual.price, true)} on ${idxDate(M, actual.i)}`) + tipRow('Miss', `${sPct(err)}${fin(derr) ? ' · ' + sDays(derr) : ''}`) : '') + tipRow('Models', F.price.n);
-    ann[key] = { type: 'box', xMin: xa, xMax: xb, yMin: F.price.lo, yMax: F.price.hi, backgroundColor: col + (live ? '26' : '38'), borderColor: col, borderWidth: 1.6, borderDash: live ? [5, 4] : [], borderRadius: 3, ...tip(html) };
+    ann[key] = { type: 'box', xMin: xa, xMax: xb, yMin: F.price.lo, yMax: F.price.hi, backgroundColor: col + (live ? '26' : '38'), borderColor: col, borderWidth: 1.6, borderDash: live ? [5, 4] : [], borderRadius: 3 };
+    hits.push({ xa, xb, lo: F.price.lo, hi: F.price.hi, html });
     if (F.date) ann[key + 'm'] = { type: 'point', xValue: F.date.v, yValue: F.price.v, radius: 3.5, backgroundColor: col, borderColor: C.surface, borderWidth: 1.5, pointStyle: 'rectRot' };
     if (live) ann[key + 'l'] = { type: 'label', xValue: (xa + xb) / 2, yValue: side === 'bottom' ? F.price.lo : F.price.hi, position: { x: 'center', y: side === 'bottom' ? 'start' : 'end' }, yAdjust: side === 'bottom' ? 6 : -6, content: `${cyc(k)} ${side} · live`, color: col, font: { size: 11, weight: '600' } };
   };
@@ -106,7 +107,7 @@ function overviewChart(M, P, canvas) {
   Object.assign(ann, cycleMarkers(M, x0, x1, { extremes: false }));
   ann.now = { type: 'line', xMin: M.lastIdx, xMax: M.lastIdx, borderColor: C.text2, borderWidth: 1, borderDash: [2, 3], label: { display: true, content: 'now', position: 'start', backgroundColor: 'transparent', color: C.text2, font: { size: 10 } } };
   const tops = M.cycles.filter(c => c.k >= 1 && c.top.i >= 0).map(c => ({ x: c.top.i, y: c.top.price })), bots = M.cycles.filter(c => c.k >= 1 && c.bottom).map(c => ({ x: c.bottom.i, y: c.bottom.price, prov: !c.bottom.final }));
-  plainChart(canvas, {
+  const chart = plainChart(canvas, {
     type: 'line',
     data: { datasets: [
       { data: pts(G.price, x0, M.lastIdx, 2), borderColor: C.text, borderWidth: 1.3, pointRadius: 0, order: 3 },
@@ -127,6 +128,18 @@ function overviewChart(M, P, canvas) {
       plugins: { legend: { display: false }, tooltip: { enabled: false }, annotation: { annotations: ann } },
     },
   });
+  // Whole-box hover with an 8px margin; smallest box wins where they overlap.
+  // stopPropagation keeps the page-level tooltip handler from hiding it again.
+  const PAD = 8;
+  canvas.addEventListener('mousemove', e => {
+    const r = canvas.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top, { x, y } = chart.scales;
+    const hit = hits.map(h => ({ h, l: x.getPixelForValue(h.xa), rr: x.getPixelForValue(h.xb), t: y.getPixelForValue(h.hi), b: y.getPixelForValue(h.lo) }))
+      .filter(q => px >= q.l - PAD && px <= q.rr + PAD && py >= q.t - PAD && py <= q.b + PAD)
+      .sort((a, b) => (a.rr - a.l) * (a.b - a.t) - (b.rr - b.l) * (b.b - b.t))[0];
+    canvas.style.cursor = hit ? 'pointer' : '';
+    if (hit) { showTip(e.clientX, e.clientY, hit.h.html); e.stopPropagation(); } else hideTip();
+  });
+  canvas.addEventListener('mouseleave', () => { canvas.style.cursor = ''; hideTip(); });
 }
 
 // ───────── comparison: leaderboard + forest ─────────
