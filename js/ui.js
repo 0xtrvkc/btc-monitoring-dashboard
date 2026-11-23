@@ -36,9 +36,12 @@ export const cycleColor = k => CYCLE_COLORS[k] || '#8e8e93';
 export const cycleDash = k => CYCLE_DASH[k] || [];
 
 // ───────── tooltip ─────────
-let tipEl;
-export function showTip(x, y, html) {
+let tipEl, tipOwner = null;
+// owner: 'dom' for [data-tip] elements (bindTips), 'chart' for charts' own tooltips.
+// bindTips only hides tips it showed, so it never fights a chart's tooltip.
+export function showTip(x, y, html, owner = 'chart') {
   if (!tipEl) { tipEl = document.createElement('div'); tipEl.className = 'tip'; document.body.appendChild(tipEl); }
+  tipOwner = owner;
   tipEl.innerHTML = html; tipEl.hidden = false;
   const r = tipEl.getBoundingClientRect(), W = innerWidth, H = innerHeight;
   let left = x + 16, top = y + 14;
@@ -46,13 +49,13 @@ export function showTip(x, y, html) {
   if (top + r.height > H - 8) top = y - r.height - 14;
   tipEl.style.left = left + 'px'; tipEl.style.top = top + 'px';
 }
-export function hideTip() { if (tipEl) tipEl.hidden = true; }
+export function hideTip() { if (tipEl) tipEl.hidden = true; tipOwner = null; }
 export const tipRow = (label, value, color) => `<div class="tr"><span>${color ? `<i style="background:${color}"></i>` : ''}${esc(label)}</span><b>${value}</b></div>`;
 
 // Attach hover tooltips to any element with data-tip (HTML string, already escaped).
 export function bindTips(root) {
-  root.addEventListener('mousemove', e => { const t = e.target.closest('[data-tip]'); if (t) showTip(e.clientX, e.clientY, t.dataset.tip); else hideTip(); });
-  root.addEventListener('mouseleave', hideTip);
+  root.addEventListener('mousemove', e => { const t = e.target.closest('[data-tip]'); if (t) showTip(e.clientX, e.clientY, t.dataset.tip, 'dom'); else if (tipOwner === 'dom') hideTip(); });
+  root.addEventListener('mouseleave', () => { if (tipOwner === 'dom') hideTip(); });
 }
 
 // ───────── charts ─────────

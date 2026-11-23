@@ -44,7 +44,7 @@ export function renderRegression(host, M, ind) {
   // chart
   const maxK = Math.max(P.target, B.target) + 0.5;
   const pts = (side, wantFinal) => R.ex.filter(e => e[side] && e[side].final === wantFinal).map(e => ({ x: e.k, y: e[side].v, _e: e, _side: side }));
-  const marker = (side, fill) => ({ data: [...pts(side, true), ...pts(side, false)], showLine: false, pointStyle: 'triangle', rotation: side === 'peak' ? 0 : 180, pointRadius: 9, pointHoverRadius: 11,
+  const marker = (side, fill) => ({ data: [...pts(side, true), ...pts(side, false)], showLine: false, pointStyle: 'triangle', rotation: side === 'peak' ? 0 : 180, pointRadius: 9, pointHitRadius: 12, pointHoverRadius: 11,
     pointBackgroundColor: ctx => { const p = ctx.raw; return p && p._e[side].final ? cycleColor(p.x) : C.surface; }, pointBorderColor: ctx => (ctx.raw ? cycleColor(ctx.raw.x) : C.text), pointBorderWidth: 2, order: 0, _marker: true, fill });
   const fitLine = (S, side, m) => {
     if (!S.fits[m] || S.saturated) return null;
@@ -54,7 +54,7 @@ export function renderRegression(host, M, ind) {
   const projPts = (S, side) => (S.saturated ? [] : ms.map(m => ({ x: S.target, y: S.proj[m], _m: m, _side: side })).filter(p => fin(p.y)));
   const ds = [marker('peak'), marker('bottom'),
     ...ms.map(m => fitLine(P, 'peak', m)), ...ms.map(m => fitLine(B, 'bottom', m)),
-    { data: [...projPts(P, 'peak'), ...projPts(B, 'bottom')], showLine: false, pointStyle: 'crossRot', pointRadius: 7, pointBorderWidth: 2, pointBorderColor: C.text2, order: 1, _proj: true },
+    { data: [...projPts(P, 'peak'), ...projPts(B, 'bottom')], showLine: false, pointStyle: 'crossRot', pointRadius: 7, pointHitRadius: 14, pointBorderWidth: 2, pointBorderColor: C.text2, order: 1, _proj: true },
   ].filter(Boolean);
   const all = ds.flatMap(d => d.data.map(p => p.y)).filter(fin);
   const lo = Math.min(...all), hi = Math.max(...all);
