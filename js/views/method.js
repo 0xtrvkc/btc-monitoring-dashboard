@@ -37,7 +37,7 @@ export function render(main, ctx) {
     <p>Honest limits: 3 completed bottoms and 4 tops. Every score is an anecdote with n ≤ 4. A sharp verdict means "has not failed yet", not "will work". This is descriptive history, not financial advice.</p>
 
     <h2>Keyboard</h2>
-    <p><code>⌘K</code> jump anywhere · <code>1</code>–<code>7</code> views · <code>[</code> <code>]</code> previous / next indicator.</p>
+    <p><code>⌘K</code> jump anywhere · <code>1</code>–<code>8</code> views · <code>[</code> <code>]</code> previous / next indicator.</p>
   </div>
   <div class="stack">
     <div class="card"><div class="card-h"><h3>Conventional lines</h3></div>

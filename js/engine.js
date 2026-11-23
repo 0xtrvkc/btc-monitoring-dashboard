@@ -55,7 +55,9 @@ export function indicatorSeries(G, ind, raw) {
     const v = ind.value(row);
     if (fin(v)) out[i] = v;
   });
-  return ffill(out, 7); // some sources are sampled every 4 days in early years
+  ffill(out, 7); // some sources are sampled every 4 days in early years
+  if (ind.from) out.fill(NaN, 0, Math.max(0, G.index(ind.from)));
+  return out;
 }
 
 // Wilder RSI on monthly closes; each day uses its own price as the open month's close.

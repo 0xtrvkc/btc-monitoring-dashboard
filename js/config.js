@@ -56,6 +56,7 @@ const r = (a, b) => (a && b && b > 0 ? a / b : NaN);
   zones     optional named bands [{ to, label, color }] in ascending value order
   composite include in the Cycle Heat composite
   fmt       'ratio' | 'pct01' | 'pct' | 'num' | 'usd'
+  from      ignore data before this date (known-bad early values)
   pe        price exponent: value ∝ price^pe at a fixed date, so the price that
             would put the indicator on a threshold today is price × (thr/value)^(1/pe).
             Moving averages drift slowly, so these levels are good for days, not months.
@@ -73,7 +74,7 @@ export const INDICATORS = [
     ],
   },
   {
-    id: 'nupl', src: 'nupl', name: 'NUPL', short: 'NUPL', group: 'On-chain valuation',
+    id: 'nupl', bounds: [-Infinity, 1], src: 'nupl', name: 'NUPL', short: 'NUPL', group: 'On-chain valuation',
     value: d => d.nupl, dir: 1, log: false, top: 0.75, bottom: 0, fmt: 'pct01', composite: false,
     desc: 'Net Unrealized Profit/Loss = (market cap − realized cap) ÷ market cap. Mathematically NUPL = 1 − 1/MVRV, so its 4-year rank is identical to MVRV; only the conventional thresholds differ (0.75 ≙ MVRV 4.0).',
     zones: [
@@ -100,14 +101,14 @@ export const INDICATORS = [
     desc: 'Price relative to Cumulative Value-Days Destroyed, an on-chain price floor. CoinTH publishes floor ÷ price; it is inverted here so that high = hot, like every other ratio.',
   },
   {
-    id: 'supply-loss', src: 'supply-in-loss', name: 'Supply in Loss', short: 'Sup. loss', group: 'On-chain valuation',
+    id: 'supply-loss', bounds: [0, 100], src: 'supply-in-loss', name: 'Supply in Loss', short: 'Sup. loss', group: 'On-chain valuation',
     value: d => d.pct, dir: -1, log: false, top: 5, bottom: 50, fmt: 'pct', composite: false,
     desc: 'Share of all coins whose last move was at a higher price. ≥ 50% = capitulation stress. History starts in 2022, so it cannot be backtested across cycles.',
   },
   {
-    id: 'prod-cost', pe: 1, src: 'production-cost', name: 'Price ÷ Production Cost', short: 'P/Cost', group: 'Miners',
+    id: 'prod-cost', pe: 1, from: '2014-07-01', src: 'production-cost', name: 'Price ÷ Production Cost', short: 'P/Cost', group: 'Miners',
     value: d => (Number.isFinite(d.margin) ? d.margin + 1 : r(d.price, d.cost)), dir: 1, log: true, top: 4, bottom: 1, fmt: 'ratio', composite: true,
-    desc: 'Price relative to the estimated all-in cost of mining one bitcoin (hashrate × electricity). Below 1, the average miner is unprofitable.',
+    desc: 'Price relative to the estimated all-in cost of mining one bitcoin (hashrate × electricity). Below 1, the average miner is unprofitable. Data before mid-2014 is dropped: the source cost estimate there is $0–13 per coin, which makes the ratio meaningless.',
   },
   {
     id: 'puell', src: 'puell', name: 'Puell Multiple', short: 'Puell', group: 'Miners',
@@ -145,17 +146,17 @@ export const INDICATORS = [
     desc: 'Price ÷ 200-day cost-average × price ÷ power-law growth value. Below 0.45 = classic bottom-fishing zone.',
   },
   {
-    id: 'rsi-m', src: 'rsi', name: 'Monthly RSI (14)', short: 'RSI-M', group: 'Momentum',
+    id: 'rsi-m', bounds: [0, 100], src: 'rsi', name: 'Monthly RSI (14)', short: 'RSI-M', group: 'Momentum',
     value: null /* computed from price in engine.js */, dir: 1, log: false, top: 85, bottom: 40, fmt: 'num', composite: true,
     desc: "Wilder RSI on monthly closes, computed here from daily price (the current month's bar is still open). Cycle-scale momentum.",
   },
   {
-    id: 'rsi22', src: 'rsi', name: 'Daily RSI (22)', short: 'RSI-22', group: 'Momentum',
+    id: 'rsi22', bounds: [0, 100], src: 'rsi', name: 'Daily RSI (22)', short: 'RSI-22', group: 'Momentum',
     value: d => d.rsi22, dir: 1, log: false, top: 80, bottom: 30, fmt: 'num', composite: false,
     desc: 'Wilder RSI over 22 daily closes — the version CoinTH uses in its checklists. Short-term; expect many false alarms at cycle scale.',
   },
   {
-    id: 'risk', src: 'risk', name: 'Downside Risk Index', short: 'Risk', group: 'Momentum',
+    id: 'risk', bounds: [0, 100], src: 'risk', name: 'Downside Risk Index', short: 'Risk', group: 'Momentum',
     value: d => d.risk, dir: -1, log: false, top: 5, bottom: 75, fmt: 'num', composite: true,
     desc: "CoinTH's downside risk index (0–100). It reads 100 near bear-market lows and 0 near tops, so high = bottom here.",
   },
@@ -163,7 +164,7 @@ export const INDICATORS = [
 
 // The composite is evaluated like any other indicator in the backtest.
 export const COMPOSITE = {
-  id: 'heat', src: null, name: 'Cycle Heat (composite)', short: 'Heat', group: 'Composite',
+  id: 'heat', bounds: [0, 100], src: null, name: 'Cycle Heat (composite)', short: 'Heat', group: 'Composite',
   dir: 1, log: false, top: 80, bottom: 20, fmt: 'num', composite: false,
   desc: 'Average of each indicator’s 4-year percentile rank (flipped where high = bottom). 0 = everything is as cheap as it has been in 4 years, 100 = everything is as hot.',
 };

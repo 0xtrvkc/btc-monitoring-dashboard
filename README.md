@@ -41,6 +41,15 @@ VIEWS
                      (12 o'clock = halving), radius = value or 4-year percentile.
                      Replay / scrub by day since halving, focus one cycle, small
                      multiples of every indicator.
+  Cycle extremes     Every indicator's ▲ peak and ▼ bottom per cycle, fitted across
+                     cycles (linear y = a·cycle + b, log y = a·ln(cycle) + b as in the
+                     MVRV dashboard, and exponential for ratio indicators) and
+                     projected to the next cycle, with the BTC price that projection
+                     implies today. Each cycle is re-predicted from earlier cycles
+                     only and compared with "same as last cycle". Plus zone days:
+                     share of each cycle spent in the bottom / top zone. Indicator
+                     pages get the full chart and a zone-days breakdown (named
+                     zones, conventional lines or 4y percentile, with avg price).
   Backtest           Every indicator × every completed top and bottom, four threshold
                      methods, a fit map (walk-forward vs hindsight) and a verdict:
                      Sharp · Correct · Overfit · Underfit (misses / loose), plus a
@@ -49,7 +58,7 @@ VIEWS
                      zone bands, conventional + fitted lines, cycle overlay, clock,
                      per-cycle table, backtest by method.
 
-  ⌘K jump anywhere · 1–7 views · [ ] previous / next indicator · ↓ Summary = text export.
+  ⌘K jump anywhere · 1–8 views · [ ] previous / next indicator · ↓ Summary = text export.
 
 
 TWO KINDS OF ZONE
@@ -80,6 +89,7 @@ js/config.js               halvings + the indicator registry — add an indicato
 js/engine.js               pure analysis (grid, percentiles, cycles, zones, backtest)
 js/clock.js                polar cycle clock (SVG)
 js/overlay.js              cycle overlay vs price (two linked Chart.js panels)
+js/extremes.js             cycle extremes, regression and zone days
 js/valuation.js            valuation zone engine (mirrors the MVRV dashboard's computeValuation)
 js/views/*.js              one file per view
 js/data.js                 loads data/*.json, falls back to the live API per series

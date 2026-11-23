@@ -6,6 +6,7 @@ import {
 } from '../ui.js';
 import { clockModel, renderClock, clockLegend } from '../clock.js';
 import { renderOverlay } from '../overlay.js';
+import { renderRegression, renderZoneDays } from './extremes.js';
 
 export function render(main, ctx, id) {
   const { M } = ctx;
@@ -63,6 +64,9 @@ export function render(main, ctx, id) {
 
   <div class="card mt"><div class="card-h"><h3>Cycle overlay vs price</h3><span class="sub">every cycle on one axis · ▲ peaks ▼ bottoms for ${esc(ind.short)} and price</span></div><div id="ov"></div></div>
 
+  <div class="card mt"><div class="card-h"><h3>Cycle extremes & regression</h3><span class="sub">▲ peak and ▼ bottom per cycle, fitted across cycles and projected to the next — each fit checked against earlier cycles only</span></div><div id="rg"></div></div>
+  <div class="card mt"><div class="card-h"><h3>Zone days</h3><span class="sub">how long ${esc(ind.short)} spent in each zone, per cycle</span></div><div id="zd"></div></div>
+
   <div class="grid g-wide mt">
     <div class="card"><div class="card-h"><h3>Backtest by method</h3><span class="sub">score 0–3 per cycle, averaged · <a href="#/backtest/${ind.id}">full detail →</a></span></div>${methodTable(B)}</div>
     <div class="card"><div class="card-h"><h3>Cycle clock</h3><span class="sub">one turn per cycle, 12 o'clock = halving</span></div><div id="clock"></div><div style="margin-top:6px">${clockLegend(M)}</div></div>
@@ -76,6 +80,8 @@ export function render(main, ctx, id) {
   main.querySelectorAll('#rng button').forEach(b => b.onclick = () => { main.querySelectorAll('#rng button').forEach(x => x.setAttribute('aria-pressed', x === b)); draw(b.dataset.r); });
   draw('All');
   renderOverlay(main.querySelector('#ov'), M, ind, { idPrefix: 'iov' });
+  renderRegression(main.querySelector('#rg'), M, ind);
+  renderZoneDays(main.querySelector('#zd'), M, ind);
   const cm = clockModel(M, ind, 'value'), ck = renderClock(M, cm, { size: 400 });
   const el = main.querySelector('#clock'); el.innerHTML = ck.svg; ck.bind(el);
 }

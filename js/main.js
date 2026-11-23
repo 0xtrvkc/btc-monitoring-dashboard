@@ -7,6 +7,7 @@ import * as zones from './views/zones.js';
 import * as indicator from './views/indicator.js';
 import * as clock from './views/clock.js';
 import * as overlayView from './views/overlay.js';
+import * as extremesView from './views/extremes.js';
 import * as backtest from './views/backtest.js';
 import * as method from './views/method.js';
 import * as valuation from './views/valuation.js';
@@ -18,9 +19,10 @@ const VIEWS = {
   zones: { mod: zones, label: 'Top & bottom zones', ico: '⇅', key: '3' },
   overlay: { mod: overlayView, label: 'Cycle overlay', ico: '≋', key: '4' },
   clock: { mod: clock, label: 'Cycle clock', ico: '◷', key: '5' },
-  backtest: { mod: backtest, label: 'Backtest', ico: '✓', key: '6' },
+  extremes: { mod: extremesView, label: 'Cycle extremes', ico: '⤒', key: '6' },
+  backtest: { mod: backtest, label: 'Backtest', ico: '✓', key: '7' },
   ind: { mod: indicator, label: 'Indicator', ico: '∿' },
-  method: { mod: method, label: 'Method & data', ico: 'ⓘ', key: '7' },
+  method: { mod: method, label: 'Method & data', ico: 'ⓘ', key: '8' },
 };
 
 const ctx = { M: null, W: null, issues: [], nav, rerender: () => route() };
@@ -54,7 +56,7 @@ function renderSidebar() {
   const item = (hash, ico, lbl, val = '', dot = null) =>
     `<button class="side-item" data-go="#/${hash}" ${cur === hash ? 'aria-current="page"' : ''}>${dot ? `<span class="dot" style="background:${dot}"></span>` : `<span class="ico">${ico}</span>`}<span class="lbl">${esc(lbl)}</span>${val ? `<span class="val">${val}</span>` : ''}</button>`;
   let h = `<div class="side-h">Monitor</div>`;
-  for (const k of ['where', 'valuation', 'zones', 'overlay', 'clock', 'backtest']) h += item(k, VIEWS[k].ico, VIEWS[k].label, `<kbd>${VIEWS[k].key}</kbd>`);
+  for (const k of ['where', 'valuation', 'zones', 'overlay', 'clock', 'extremes', 'backtest']) h += item(k, VIEWS[k].ico, VIEWS[k].label, `<kbd>${VIEWS[k].key}</kbd>`);
   const groups = [...new Set(ALL_INDICATORS.map(x => x.group))];
   for (const g of groups) {
     h += `<div class="side-h">${esc(g)}</div>`;
