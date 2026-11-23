@@ -6,16 +6,18 @@ import * as overview from './views/overview.js';
 import * as zones from './views/zones.js';
 import * as indicator from './views/indicator.js';
 import * as clock from './views/clock.js';
+import * as overlayView from './views/overlay.js';
 import * as backtest from './views/backtest.js';
 import * as method from './views/method.js';
 
 const VIEWS = {
   where: { mod: overview, label: 'Where am I?', ico: '◎', key: '1' },
   zones: { mod: zones, label: 'Top & bottom zones', ico: '⇅', key: '2' },
-  clock: { mod: clock, label: 'Cycle clock', ico: '◷', key: '3' },
-  backtest: { mod: backtest, label: 'Backtest', ico: '✓', key: '4' },
+  overlay: { mod: overlayView, label: 'Cycle overlay', ico: '≋', key: '3' },
+  clock: { mod: clock, label: 'Cycle clock', ico: '◷', key: '4' },
+  backtest: { mod: backtest, label: 'Backtest', ico: '✓', key: '5' },
   ind: { mod: indicator, label: 'Indicator', ico: '∿' },
-  method: { mod: method, label: 'Method & data', ico: 'ⓘ', key: '5' },
+  method: { mod: method, label: 'Method & data', ico: 'ⓘ', key: '6' },
 };
 
 const ctx = { M: null, W: null, issues: [], nav, rerender: () => route() };
@@ -46,7 +48,7 @@ function renderSidebar() {
   const item = (hash, ico, lbl, val = '', dot = null) =>
     `<button class="side-item" data-go="#/${hash}" ${cur === hash ? 'aria-current="page"' : ''}>${dot ? `<span class="dot" style="background:${dot}"></span>` : `<span class="ico">${ico}</span>`}<span class="lbl">${esc(lbl)}</span>${val ? `<span class="val">${val}</span>` : ''}</button>`;
   let h = `<div class="side-h">Monitor</div>`;
-  for (const k of ['where', 'zones', 'clock', 'backtest']) h += item(k, VIEWS[k].ico, VIEWS[k].label, `<kbd>${VIEWS[k].key}</kbd>`);
+  for (const k of ['where', 'zones', 'overlay', 'clock', 'backtest']) h += item(k, VIEWS[k].ico, VIEWS[k].label, `<kbd>${VIEWS[k].key}</kbd>`);
   const groups = [...new Set(ALL_INDICATORS.map(x => x.group))];
   for (const g of groups) {
     h += `<div class="side-h">${esc(g)}</div>`;
@@ -75,6 +77,7 @@ function paletteItems() {
   const items = Object.entries(VIEWS).filter(([k]) => k !== 'ind').map(([k, v]) => ({ hash: '#/' + k, label: v.label, hint: 'View' }));
   for (const ind of ALL_INDICATORS) {
     items.push({ hash: '#/ind/' + ind.id, label: ind.name, hint: ind.group });
+    items.push({ hash: '#/overlay/' + ind.id, label: ind.name + ' — cycle overlay vs price', hint: 'Overlay' });
     items.push({ hash: '#/clock/' + ind.id, label: ind.name + ' — cycle clock', hint: 'Clock' });
     items.push({ hash: '#/backtest/' + ind.id, label: ind.name + ' — backtest', hint: 'Backtest' });
   }
@@ -178,7 +181,7 @@ addEventListener('keydown', e => {
   if (e.target.closest('input, select, textarea') || e.metaKey || e.ctrlKey || e.altKey) return;
   const v = Object.entries(VIEWS).find(([, x]) => x.key === e.key);
   if (v) { nav('#/' + v[0]); return; }
-  if ((e.key === ']' || e.key === '[') && (ctx.view === 'ind' || ctx.view === 'clock' || ctx.view === 'backtest')) {
+  if ((e.key === ']' || e.key === '[') && (ctx.view === 'ind' || ctx.view === 'clock' || ctx.view === 'backtest' || ctx.view === 'overlay')) {
     const ids = ALL_INDICATORS.map(x => x.id), j = Math.max(0, ids.indexOf(ctx.arg));
     const nx = ids[(j + (e.key === ']' ? 1 : -1) + ids.length) % ids.length];
     nav(`#/${ctx.view}/${nx}`);

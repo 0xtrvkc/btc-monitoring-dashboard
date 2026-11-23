@@ -37,13 +37,13 @@ export function render(main, ctx) {
     <p>Honest limits: 3 completed bottoms and 4 tops. Every score is an anecdote with n ≤ 4. A sharp verdict means "has not failed yet", not "will work". This is descriptive history, not financial advice.</p>
 
     <h2>Keyboard</h2>
-    <p><code>⌘K</code> jump anywhere · <code>1</code>–<code>5</code> views · <code>[</code> <code>]</code> previous / next indicator.</p>
+    <p><code>⌘K</code> jump anywhere · <code>1</code>–<code>6</code> views · <code>[</code> <code>]</code> previous / next indicator.</p>
   </div>
   <div class="stack">
     <div class="card"><div class="card-h"><h3>Conventional lines</h3></div>
-      <table><thead><tr><th>Indicator</th><th class="n">Bottom</th><th class="n">Top</th><th>High =</th></tr></thead><tbody>
+      <div class="tbl-wrap compact"><table><thead><tr><th>Indicator</th><th class="n">Bottom</th><th class="n">Top</th><th>High =</th></tr></thead><tbody>
       ${[COMPOSITE, ...INDICATORS].map(i => `<tr><td>${esc(i.name)}</td><td class="n">${i.bottom != null ? (i.dir < 0 ? '≥ ' : '≤ ') + fmtVal(i, i.bottom) : '—'}</td><td class="n">${i.top != null ? (i.dir < 0 ? '≤ ' : '≥ ') + fmtVal(i, i.top) : '—'}</td><td>${i.dir > 0 ? 'hot' : 'cheap'}</td></tr>`).join('')}
-      </tbody></table></div>
+      </tbody></table></div></div>
     <div class="card"><div class="card-h"><h3>Snapshot</h3></div>
       <div class="t2">Fetched ${esc(L?.fetchedAt || '—')}<br>Latest close ${M.G.dates[M.lastIdx]}<br>${M.G.n.toLocaleString()} days · engine ${M.builtMs} ms</div>
       ${ctx.issues.length ? `<div class="callout" style="margin-top:8px">Missing: ${esc(ctx.issues.join('; '))}</div>` : ''}

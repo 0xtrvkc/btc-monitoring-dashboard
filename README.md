@@ -21,6 +21,13 @@ VIEWS
                      a tile per indicator.
   Top & bottom zones Weekly zone map of every indicator since 2012, breadth (how many
                      are in a zone each day), board with distance to each line.
+  Cycle overlay      Every cycle on one x-axis (% of the halving interval, or days
+                     since halving): the indicator panel above a BTC price panel
+                     indexed to the close of the day before each halving (1×, log).
+                     One crosshair reads every cycle. ▲ peak / ▼ bottom markers for
+                     the indicator AND price, plus a table of which turned first.
+                     Hover a cycle to highlight it, click to pin. Also on every
+                     indicator page.
   Cycle clock        Polar chart per indicator: one clockwise turn per cycle
                      (12 o'clock = halving), radius = value or 4-year percentile.
                      Replay / scrub by day since halving, focus one cycle, small
@@ -33,7 +40,7 @@ VIEWS
                      zone bands, conventional + fitted lines, cycle overlay, clock,
                      per-cycle table, backtest by method.
 
-  ⌘K jump anywhere · 1–5 views · [ ] previous / next indicator · ↓ Summary = text export.
+  ⌘K jump anywhere · 1–6 views · [ ] previous / next indicator · ↓ Summary = text export.
 
 
 TWO KINDS OF ZONE
@@ -63,6 +70,7 @@ index.html, css/app.css    shell and glass theme (light / dark)
 js/config.js               halvings + the indicator registry — add an indicator here
 js/engine.js               pure analysis (grid, percentiles, cycles, zones, backtest)
 js/clock.js                polar cycle clock (SVG)
+js/overlay.js              cycle overlay vs price (two linked Chart.js panels)
 js/views/*.js              one file per view
 js/data.js                 loads data/*.json, falls back to the live API per series
 data/*.json                daily snapshots of the CoinTH API (column format)

@@ -70,11 +70,12 @@ const crosshair = {
   afterEvent(chart, args) {
     const o = chart.options.plugins.crosshair; if (!o || !o.group) return;
     const g = GROUPS[o.group]; const e = args.event;
-    if (e.type === 'mouseout') { g.x = null; g.charts.forEach(c => c.draw()); hideTip(); return; }
+    if (e.type === 'mouseout') { g.x = null; g.charts.forEach(c => c.draw()); hideTip(); g.onLeave?.(); return; }
     if (e.type !== 'mousemove') return;
     const a = chart.chartArea;
     if (e.x < a.left || e.x > a.right || e.y < a.top || e.y > a.bottom) { if (g.x != null) { g.x = null; g.charts.forEach(c => c.draw()); hideTip(); } return; }
-    g.x = Math.round(chart.scales.x.getValueForPixel(e.x));
+    const raw = chart.scales.x.getValueForPixel(e.x);
+    g.x = g.round ? Math.round(raw) : raw;
     g.charts.forEach(c => c.draw());
     if (g.tooltip) { const html = g.tooltip(g.x); if (html) showTip(e.native.clientX, e.native.clientY, html); else hideTip(); }
   },
@@ -90,7 +91,8 @@ const crosshair = {
 };
 if (window.Chart) { Chart.register(crosshair); Chart.defaults.font.family = css('--font') || 'system-ui'; }
 
-export function group(name, tooltip) { GROUPS[name] = { x: null, charts: [], tooltip }; return name; }
+export function group(name, tooltip, { round = true, onLeave } = {}) { GROUPS[name] = { x: null, charts: [], tooltip, round, onLeave }; return name; }
+export function joinGroup(name, chart) { GROUPS[name].charts.push(chart); }
 
 // Year ticks on a day-index axis.
 export function yearTicks(M, scale, every = 1) {

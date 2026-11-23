@@ -1,10 +1,11 @@
 import { ALL_INDICATORS, byId } from '../config.js';
 import { heatLabel, classicZone, adaptiveZone, namedZone, progressTo, impliedPrice, VERDICTS } from '../engine.js';
 import {
-  fin, esc, fmtVal, usd, pct, int, cyc, cycleColor, cycleDash, chip, heatbar, heatColor, themeColors,
-  timePanel, group, pts, cycleMarkers, hLine, tipRow, plainChart, bindTips, signedDays, showTip, hideTip,
+  fin, esc, fmtVal, usd, pct, int, cyc, cycleColor, chip, heatbar, heatColor, themeColors,
+  timePanel, group, pts, cycleMarkers, hLine, tipRow, bindTips, signedDays,
 } from '../ui.js';
 import { clockModel, renderClock, clockLegend } from '../clock.js';
+import { renderOverlay } from '../overlay.js';
 
 export function render(main, ctx, id) {
   const { M } = ctx;
@@ -28,13 +29,13 @@ export function render(main, ctx, id) {
   };
   const verdictBlock = side => {
     const S = B[side], V = VERDICTS[S.verdict];
-    return `<div class="row" style="margin-bottom:6px"><span class="t2" style="width:70px">${side === 'top' ? 'Tops' : 'Bottoms'}</span><span class="chip ${V.tone}">${V.label}</span>${S.verdict !== 'na' && S.verdict !== 'insufficient' ? `<span class="chip ${S.stable ? 'mid' : 'warn'}" title="Same verdict with looser fitting windows?">${S.stable ? 'stable' : 'fragile'}</span>` : ''}</div>`;
+    return `<div class="row wrap" style="margin-bottom:6px;gap:6px"><span class="t2" style="width:64px">${side === 'top' ? 'Tops' : 'Bottoms'}</span><span class="chip ${V.tone}">${V.label}</span>${S.verdict !== 'na' && S.verdict !== 'insufficient' ? `<span class="chip ${S.stable ? 'mid' : 'warn'}" title="Same verdict with looser fitting windows?">${S.stable ? 'stable' : 'fragile'}</span>` : ''}</div>`;
   };
 
   main.innerHTML = `
   <div class="page-h"><div><div class="kicker">${esc(ind.group)}</div><h1>${esc(ind.name)}</h1><p>${esc(ind.desc)}</p></div>
     <div class="right"><button class="btn" data-go="#/ind/${prev}" title="Previous ( [ )">‹</button><button class="btn" data-go="#/ind/${next}" title="Next ( ] )">›</button>
-    <button class="btn" data-go="#/clock/${ind.id}">◷ Cycle clock</button><button class="btn" data-go="#/backtest/${ind.id}">✓ Backtest</button></div></div>
+    <button class="btn" data-go="#/overlay/${ind.id}">≋ Overlay</button><button class="btn" data-go="#/clock/${ind.id}">◷ Cycle clock</button><button class="btn" data-go="#/backtest/${ind.id}">✓ Backtest</button></div></div>
 
   <div class="grid g4">
     <div class="card"><div class="kicker">Now · ${M.G.dates[i]}</div><div class="big" style="margin:6px 0">${fmtVal(ind, v)}</div>${chip(zone, nz ? nz.label : null)}</div>
@@ -60,24 +61,22 @@ export function render(main, ctx, id) {
     </div>
   </div>
 
-  <div class="grid g2 mt">
-    <div class="card"><div class="card-h"><h3>Cycle overlay</h3><span class="sub">x = days since halving</span>
-      <div class="right"><div class="seg" id="ov-mode"><button data-m="value" aria-pressed="true">Value</button><button data-m="heat" aria-pressed="false">Percentile</button></div></div></div>
-      <div class="chart" style="height:340px"><canvas id="c-ov"></canvas></div><div id="ov-legend" style="margin-top:8px"></div></div>
+  <div class="card mt"><div class="card-h"><h3>Cycle overlay vs price</h3><span class="sub">every cycle on one axis · ▲ peaks ▼ bottoms for ${esc(ind.short)} and price</span></div><div id="ov"></div></div>
+
+  <div class="grid g-wide mt">
+    <div class="card"><div class="card-h"><h3>Backtest by method</h3><span class="sub">score 0–3 per cycle, averaged · <a href="#/backtest/${ind.id}">full detail →</a></span></div>${methodTable(B)}</div>
     <div class="card"><div class="card-h"><h3>Cycle clock</h3><span class="sub">one turn per cycle, 12 o'clock = halving</span></div><div id="clock"></div><div style="margin-top:6px">${clockLegend(M)}</div></div>
   </div>
 
   <div class="card mt"><div class="card-h"><h3>Each cycle</h3><span class="sub">value at the price extreme and when the indicator made its own extreme</span></div>${cycleTable(M, ind)}</div>
-  <div class="card mt"><div class="card-h"><h3>Backtest by method</h3><span class="sub">score 0–3 per cycle, averaged · <a href="#/backtest/${ind.id}">full detail →</a></span></div>${methodTable(B)}</div>`;
+`;
 
   bindTips(main);
   const draw = r => { const n = i, span = { All: n, '8Y': 2922, '4Y': 1461, '1Y': 365 }[r]; drawHistory(M, ind, Math.max(firstValid(M.series[ind.id]), M.G.index('2012-01-01'), n - span), n, fitted); };
   main.querySelectorAll('#rng button').forEach(b => b.onclick = () => { main.querySelectorAll('#rng button').forEach(x => x.setAttribute('aria-pressed', x === b)); draw(b.dataset.r); });
   draw('All');
-  const ov = m => { drawOverlay(M, ind, m, main.querySelector('#ov-legend')); };
-  main.querySelectorAll('#ov-mode button').forEach(b => b.onclick = () => { main.querySelectorAll('#ov-mode button').forEach(x => x.setAttribute('aria-pressed', x === b)); ov(b.dataset.m); });
-  ov('value');
-  const cm = clockModel(M, ind, 'value'), ck = renderClock(M, cm, { size: 420 });
+  renderOverlay(main.querySelector('#ov'), M, ind, { idPrefix: 'iov' });
+  const cm = clockModel(M, ind, 'value'), ck = renderClock(M, cm, { size: 400 });
   const el = main.querySelector('#clock'); el.innerHTML = ck.svg; ck.bind(el);
 }
 
@@ -125,48 +124,6 @@ function drawHistory(M, ind, from, to, fitted) {
 }
 const fmtTick = (ind, v) => (ind.fmt === 'pct01' ? Math.round(v * 100) + '%' : ind.fmt === 'pct' ? v + '%' : Math.abs(v) < 10 && v % 1 ? +v.toFixed(2) : v);
 
-function drawOverlay(M, ind, mode, legendEl) {
-  const C = themeColors();
-  const old = Chart.getChart(document.getElementById('c-ov')); if (old) old.destroy();
-  const src = mode === 'heat' ? M.heat[ind.id] : M.series[ind.id];
-  const live = M.cycles.at(-1);
-  const ds = M.cycles.filter(c => c.k >= 1).map(c => {
-    const data = [];
-    for (let i = c.start; i < Math.min(c.end, M.G.n); i += 2) if (fin(src[i])) data.push({ x: i - c.start, y: src[i] });
-    return { label: cyc(c.k), data, borderColor: cycleColor(c.k), borderDash: cycleDash(c.k), borderWidth: c === live ? 2.6 : 1.4, order: c === live ? 0 : 1 };
-  });
-  const ann = {};
-  const L = M.lastIdx - live.start;
-  ann.today = { type: 'line', xMin: L, xMax: L, borderColor: C.text2, borderWidth: 1, borderDash: [3, 3], label: { display: true, content: 'today', position: 'start', color: C.text2, backgroundColor: 'transparent', font: { size: 10 } } };
-  if (mode === 'heat') { ann.lo = { type: 'box', yMin: 0, yMax: 10, backgroundColor: 'rgba(57,135,229,.12)', borderWidth: 0 }; ann.hi = { type: 'box', yMin: 90, yMax: 100, backgroundColor: 'rgba(208,59,59,.12)', borderWidth: 0 }; }
-  else { if (ind.bottom != null) ann.b = hLine(ind.bottom, C.cold, null); if (ind.top != null) ann.t = hLine(ind.top, C.hot, null); }
-  const ch = plainChart(document.getElementById('c-ov'), {
-    type: 'line', data: { datasets: ds },
-    options: {
-      responsive: true, maintainAspectRatio: false, animation: false, parsing: false,
-      elements: { point: { radius: 0 }, line: { tension: 0 } },
-      interaction: { mode: 'nearest', axis: 'x', intersect: false },
-      scales: {
-        x: { type: 'linear', min: 0, max: 1500, grid: { color: C.grid }, border: { display: false }, ticks: { color: C.muted, stepSize: 250, callback: v => v + 'd' } },
-        y: { type: mode === 'value' && ind.log ? 'logarithmic' : 'linear', min: mode === 'heat' ? 0 : undefined, max: mode === 'heat' ? 100 : undefined, grid: { color: C.grid }, border: { display: false },
-          ticks: { color: C.muted, maxTicksLimit: 7, callback: v => (mode === 'heat' ? v : ind.log ? (/^[125]/.test(String(v)) ? fmtTick(ind, v) : '') : fmtTick(ind, v)) }, afterFit: s => { s.width = 50; } },
-      },
-      plugins: {
-        legend: { display: false }, annotation: { annotations: ann },
-        tooltip: { enabled: false, external: ({ chart, tooltip }) => {
-          if (!tooltip.opacity || !tooltip.dataPoints?.length) { hideTip(); return; }
-          const d = Math.round(tooltip.dataPoints[0].parsed.x);
-          const rows = M.cycles.filter(c => c.k >= 1).map(c => { const k = c.start + d; return k < Math.min(c.end, M.G.n) ? tipRow(cyc(c.k) + ' · ' + M.G.dates[k], mode === 'heat' ? (fin(src[k]) ? src[k].toFixed(0) : '—') : fmtVal(ind, src[k]), cycleColor(c.k)) : ''; }).join('');
-          const b = chart.canvas.getBoundingClientRect();
-          showTip(b.left + tooltip.caretX, b.top + tooltip.caretY, `<div class="th">Day ${d} after halving</div>${rows}`);
-        } },
-      },
-    },
-  });
-  ch.canvas.addEventListener('mouseleave', hideTip);
-  legendEl.innerHTML = `<div class="legend">${M.cycles.filter(c => c.k >= 1).map(c => `<span><i style="background:${cycleColor(c.k)}"></i>${cyc(c.k)} ${c.startDate.slice(0, 4)}${c === live ? ' (live)' : ''}</span>`).join('')}</div>`;
-}
-
 function cycleTable(M, ind) {
   const T = M.backtest[ind.id].sides.top.rows, Bt = M.backtest[ind.id].sides.bottom.rows;
   const rows = M.cycles.filter(c => c.k >= 1).map(c => {
@@ -178,7 +135,7 @@ function cycleTable(M, ind) {
       <td>${c.bottom ? c.bottom.date + (c.bottom.final ? '' : ' *') : '—'}</td><td class="n">${c.bottom ? usd(c.bottom.price, true) : '—'}</td><td class="n"><b>${at(c.bottom)}</b></td>
       <td class="n">${b?.own ? fmtVal(ind, b.own.value) : '—'}</td><td>${b?.own ? signedDays(-b.own.lagDays) : '—'}</td></tr>`;
   }).join('');
-  return `<div class="tbl-wrap"><table><thead><tr><th>Cycle</th><th>Price top</th><th class="n">Price</th><th class="n">${esc(ind.short)} at top</th><th class="n">Own peak</th><th>Own peak vs top</th>
+  return `<div class="tbl-wrap compact"><table><thead><tr><th>Cycle</th><th>Price top</th><th class="n">Price</th><th class="n">${esc(ind.short)} at top</th><th class="n">Own peak</th><th>Own peak vs top</th>
     <th>Price bottom</th><th class="n">Price</th><th class="n">${esc(ind.short)} at bottom</th><th class="n">Own trough</th><th>Own trough vs bottom</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="note" style="margin-top:6px">* provisional (cycle not finished). "Own peak" is the indicator's most extreme value between the previous bottom and this bottom (and vice versa); "before" means the indicator turned first.</div>`;
 }
@@ -187,9 +144,9 @@ function methodTable(B) {
   const name = { classic: 'Conventional lines', adaptive: '4y percentile 90/10', walk: 'Walk-forward fit', insample: 'In-sample fit (hindsight)' };
   const cell = m => m.n ? `${m.score.toFixed(1)}<span class="muted">/3</span>` : '—';
   const lead = m => (fin(m.medLead) ? int(m.medLead) + 'd' : '—');
-  return `<table><thead><tr><th>Method</th><th class="n">Bottoms score</th><th class="n">hit</th><th class="n">false alarms</th><th class="n">median lead</th><th class="bt-group n">Tops score</th><th class="n">hit</th><th class="n">false alarms</th><th class="n">median lead</th></tr></thead><tbody>
+  return `<div class="tbl-wrap compact"><table><thead><tr><th>Method</th><th class="n">Bottoms score</th><th class="n">hit</th><th class="n">false alarms</th><th class="n">median lead</th><th class="bt-group n">Tops score</th><th class="n">hit</th><th class="n">false alarms</th><th class="n">median lead</th></tr></thead><tbody>
     ${['classic', 'adaptive', 'walk', 'insample'].map(k => { const b = B.bottom.methods[k], t = B.top.methods[k]; return `<tr><td>${name[k]}</td>
       <td class="n">${cell(b)}</td><td class="n">${b.n ? b.hits + '/' + b.n : '—'}</td><td class="n">${b.n ? b.falseAlarms : '—'}</td><td class="n">${lead(b)}</td>
       <td class="n bt-group">${cell(t)}</td><td class="n">${t.n ? t.hits + '/' + t.n : '—'}</td><td class="n">${t.n ? t.falseAlarms : '—'}</td><td class="n">${lead(t)}</td></tr>`; }).join('')}
-  </tbody></table>`;
+  </tbody></table></div>`;
 }

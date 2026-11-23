@@ -86,7 +86,7 @@ function sameDay(M, ind, d) {
       <td class="n"><span class="dot" style="display:inline-block;background:${heatColor(h)};margin-right:6px"></span>${fin(h) ? h.toFixed(0) : '—'}</td><td class="n">${ok ? usd(M.G.price[j], true) : '—'}</td>
       <td>${ok ? (j < c.top.i ? 'before top' : c.bottom && j < c.bottom.i ? 'top → bottom' : c.bottom ? 'after bottom' : '') : ''}</td></tr>`;
   }).join('');
-  return `<table><thead><tr><th>Cycle</th><th>Date</th><th class="n">${esc(ind.short)}</th><th class="n">pct</th><th class="n">Price</th><th>Phase</th></tr></thead><tbody>${rows}</tbody></table>`;
+  return `<div class="tbl-wrap compact"><table><thead><tr><th>Cycle</th><th>Date</th><th class="n">${esc(ind.short)}</th><th class="n">pct</th><th class="n">Price</th><th>Phase</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function angles(M, ind) {
@@ -98,6 +98,6 @@ function angles(M, ind) {
       <td class="n">${deg(c, c.top.i)}${c.top.final ? '' : '*'}</td><td class="n">${t && t.i >= c.start && t.i < c.end ? deg(c, t.i) : '—'}</td>
       <td class="n">${c.bottom ? deg(c, c.bottom.i) + (c.bottom.final ? '' : '*') : '—'}</td><td class="n">${b && b.i >= c.start && b.i < c.end ? deg(c, b.i) : b ? 'next cycle' : '—'}</td></tr>`;
   }).join('');
-  return `<table><thead><tr><th>Cycle</th><th class="n">Price top</th><th class="n">${esc(ind.short)} peak</th><th class="n">Price bottom</th><th class="n">${esc(ind.short)} trough</th></tr></thead><tbody>${rows}</tbody></table>
+  return `<div class="tbl-wrap compact"><table><thead><tr><th>Cycle</th><th class="n">Price top</th><th class="n">${esc(ind.short)} peak</th><th class="n">Price bottom</th><th class="n">${esc(ind.short)} trough</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="note" style="margin-top:6px">90° ≈ 1 year after the halving. * provisional.</div>`;
 }
