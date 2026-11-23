@@ -338,3 +338,11 @@ select.sel { height: 28px; border-radius: var(--r-sm); border: 1px solid var(--s
 #asof:not(.asof-ok) { display: inline !important; }
 .stale-tag { color: #fab219; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 :root[data-theme="light"] .stale-tag { color: #8a5a00; }
+
+/* backtest matrix: bottoms | tops group headings */
+.bt-matrix tr.grp th { border-bottom: 0; padding-bottom: 0; }
+.bt-matrix .grp-h { text-align: left; font-size: 12px; font-weight: 700; letter-spacing: .02em; text-transform: none; }
+.bt-matrix .grp-h span { font-weight: 400; color: var(--muted); margin-left: 6px; }
+.bt-matrix .grp-h.cold { color: var(--cold); }
+.bt-matrix .grp-h.hot { color: var(--hot); }
+.bt-matrix td, .bt-matrix th { padding-left: 7px; padding-right: 7px; }

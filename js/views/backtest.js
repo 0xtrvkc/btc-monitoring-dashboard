@@ -86,11 +86,14 @@ function matrix(M, cb, ct, sel) {
     const sc = S.methods[m];
     return `<td><span class="chip ${V.tone}" data-tip="${esc(`<div class='th'>${V.label}</div>${S.why}`)}">${V.label}${S.stable ? '' : ' ⚠︎'}</span></td><td class="n num">${sc.n ? sc.score.toFixed(1) : '—'}</td>`;
   };
-  const rows = ALL_INDICATORS.map(ind => `<tr class="click ${sel && sel.id === ind.id ? 'sel' : ''}" data-go="#/backtest/${ind.id}"><td><b>${esc(ind.name)}</b></td>
+  const rows = ALL_INDICATORS.map(ind => `<tr class="click ${sel && sel.id === ind.id ? 'sel' : ''}" data-go="#/backtest/${ind.id}"><td title="${esc(ind.name)}"><b>${esc(ind.id === 'heat' ? 'Cycle Heat' : ind.short || ind.name)}</b></td>
     ${cb.map(k => cell(ind, 'bottom', k)).join('')}${verdict(ind, 'bottom')}
     <td class="bt-group"></td>${ct.map(k => cell(ind, 'top', k)).join('')}${verdict(ind, 'top')}</tr>`).join('');
-  return `<div class="tbl-wrap"><table><thead><tr><th>Indicator</th>${cb.map(k => `<th class="n">${cyc(k)}</th>`).join('')}<th>Bottoms verdict</th><th class="n">${METHODS[m].label} avg</th>
-    <th class="bt-group"></th>${ct.map(k => `<th class="n">${cyc(k)}</th>`).join('')}<th>Tops verdict</th><th class="n">${METHODS[m].label} avg</th></tr></thead><tbody>${rows}</tbody></table></div>
+  const avgTip = `title="${METHODS[m].label} average score, 0–3"`;
+  return `<div class="tbl-wrap bt-matrix"><table><thead>
+    <tr class="grp"><th></th><th colspan="${cb.length + 2}" class="grp-h cold">▼ Bottoms <span>bear-market lows</span></th><th class="bt-group"></th><th colspan="${ct.length + 2}" class="grp-h hot">▲ Tops <span>cycle peaks</span></th></tr>
+    <tr><th>Indicator</th>${cb.map(k => `<th class="n">${cyc(k)}</th>`).join('')}<th>Verdict</th><th class="n" ${avgTip}>Avg</th>
+    <th class="bt-group"></th>${ct.map(k => `<th class="n">${cyc(k)}</th>`).join('')}<th>Verdict</th><th class="n" ${avgTip}>Avg</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="legend" style="margin-top:10px"><span><span class="cell sharp">S</span> Sharp 3</span><span><span class="cell correct">C</span> Correct 2</span><span><span class="cell early">E</span> Early 1</span><span><span class="cell missed">M</span> Missed 0</span><span><span class="cell correct">C<sup>!</sup></span> false alarm, −1</span><span><span class="cell na">–</span> no data / no earlier cycle</span>
     <span class="muted">Cells follow the selected method; verdicts always come from walk-forward vs in-sample.</span></div>`;
 }
