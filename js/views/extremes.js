@@ -1,5 +1,6 @@
 import { ALL_INDICATORS } from '../config.js';
 import { regression, zoneDays, MODELS } from '../extremes.js';
+import { leadLag, SYNC_DAYS } from '../engine.js';
 import { fin, esc, fmtVal, usd, int, cyc, cycleColor, themeColors, plainChart, hLine, tipRow, showTip, hideTip, bindTips } from '../ui.js';
 
 const MSTYLE = { lin: { dash: [6, 4], w: 1.6 }, log: { dash: [], w: 2.2 }, exp: { dash: [2, 3], w: 2 } };
@@ -128,6 +129,76 @@ export function renderZoneDays(host, M, ind) {
   draw();
 }
 
+// ───────── lead / lag vs price turns ─────────
+const llState = { side: 'top', metric: 'own', sort: 'time' };
+const span = d => { const a = Math.abs(d); return a < 45 ? a + 'd' : a < 365 ? Math.round(a / 30.44) + ' mo' : (a / 365.25).toFixed(1) + ' y'; };
+const timing = d => (d == null ? '—' : Math.abs(d) <= SYNC_DAYS ? (d === 0 ? 'same day' : `in sync (${d > 0 ? span(d) + ' before' : span(d) + ' after'})`) : d > 0 ? span(d) + ' before' : span(d) + ' after');
+// pseudo-log time axis: detail near the turn, still fits two-year leads
+const XMAX = 1000, fx = u => Math.sign(u) * Math.log1p(Math.abs(u) / 30);
+
+function leadLagCard(host, M) {
+  const draw = () => {
+    const { side, metric, sort } = llState;
+    const L = leadLag(M, side, metric);
+    const rows = sort === 'time' ? [...L].sort((a, b) => (b.med ?? -1e9) - (a.med ?? -1e9)) : L;
+    const ks = [...new Set(L.flatMap(r => r.pts.map(p => p.k)))].sort();
+    const turn = side === 'top' ? 'price top' : 'price bottom', ownW = side === 'top' ? 'peak' : 'low';
+    const all = L.flatMap(r => r.pts.filter(p => p.d != null));
+    const cnt = f => all.filter(f).length;
+    const W = Math.max(720, host.querySelector('.ll-plot').clientWidth), LW = 168, RW = 178, top = 46, RH = 32, H = top + rows.length * RH + 34;
+    const x0 = LW + 10, x1 = W - RW - 10, sx = u => x0 + (fx(Math.max(-XMAX, Math.min(XMAX, u))) + fx(XMAX)) / (2 * fx(XMAX)) * (x1 - x0);
+    const lane = k => (ks.indexOf(k) - (ks.length - 1) / 2) * 4.6;
+    const ticks = [[-730, '2y'], [-365, '1y'], [-180, '6mo'], [-90, '3mo'], [-30, '1mo'], [0, ''], [30, '1mo'], [90, '3mo'], [180, '6mo'], [365, '1y'], [730, '2y']];
+    let g = '';
+    // regions
+    g += `<rect x="${x0}" y="${top - 6}" width="${sx(-SYNC_DAYS) - x0}" height="${rows.length * RH + 6}" fill="var(--cold)" opacity=".05"/>`;
+    g += `<rect x="${sx(SYNC_DAYS)}" y="${top - 6}" width="${x1 - sx(SYNC_DAYS)}" height="${rows.length * RH + 6}" fill="var(--hot)" opacity=".05"/>`;
+    g += `<rect x="${sx(-SYNC_DAYS)}" y="${top - 6}" width="${sx(SYNC_DAYS) - sx(-SYNC_DAYS)}" height="${rows.length * RH + 6}" fill="var(--text)" opacity=".06"/>`;
+    g += `<text x="${x0 + 4}" y="${top - 14}" class="ll-reg">◀ Indicator turned first (leads)</text><text x="${x1 - 4}" y="${top - 14}" class="ll-reg" text-anchor="end">Indicator turned after (lags) ▶</text>`;
+    g += `<text x="${sx(0)}" y="${top - 14}" class="ll-zero" text-anchor="middle">${side === 'top' ? '▲ Price top' : '▼ Price bottom'}</text>`;
+    for (const [u, l] of ticks) { const X = sx(u); g += `<line x1="${X}" x2="${X}" y1="${top - 6}" y2="${top + rows.length * RH}" stroke="${u ? 'var(--grid)' : 'var(--text-2)'}" stroke-width="${u ? 1 : 1.5}"/>`; if (l) g += `<text x="${X}" y="${top + rows.length * RH + 15}" class="ll-tick" text-anchor="middle">${l}</text>`; }
+    g += `<text x="${sx(-200)}" y="${top + rows.length * RH + 30}" class="ll-tick" text-anchor="middle">before</text><text x="${sx(200)}" y="${top + rows.length * RH + 30}" class="ll-tick" text-anchor="middle">after</text><text x="${sx(0)}" y="${top + rows.length * RH + 15}" class="ll-tick" text-anchor="middle">±${SYNC_DAYS}d</text>`;
+    g += `<text x="${W - RW + 4}" y="${top - 14}" class="ll-reg">Typical (median)</text>`;
+    rows.forEach((r, j) => {
+      const yc = top + j * RH + RH / 2, ds = r.pts.filter(p => p.d != null);
+      g += `<g class="ll-row" data-go="#/ind/${r.ind.id}"><rect x="0" y="${yc - RH / 2}" width="${W}" height="${RH}" fill="transparent"/>`;
+      if (j) g += `<line x1="${x0}" x2="${x1}" y1="${yc - RH / 2}" y2="${yc - RH / 2}" stroke="var(--grid)"/>`;
+      g += `<text x="${LW}" y="${yc + 4}" class="ll-name" text-anchor="end">${esc(r.ind.name)}</text>`;
+      if (ds.length > 1) { const us = ds.map(p => -p.d); g += `<line x1="${sx(Math.min(...us))}" x2="${sx(Math.max(...us))}" y1="${yc}" y2="${yc}" stroke="var(--muted)" stroke-width="1.5" opacity=".55"/>`; }
+      if (r.med != null) g += `<line x1="${sx(-r.med)}" x2="${sx(-r.med)}" y1="${yc - 9}" y2="${yc + 9}" stroke="var(--text)" stroke-width="2.4" stroke-linecap="round"/>`;
+      for (const p of ds) {
+        const tip = `<div class='th'>${esc(r.ind.short || r.ind.name)} · ${cyc(p.k)} ${side}</div>` + tipRow(`Price ${side}`, `${p.extDate} · ${usd(p.extPrice, true)}`, cycleColor(p.k))
+          + tipRow(metric === 'own' ? `Indicator ${ownW}` : 'First zone signal', `${p.date}${p.value != null ? ' · ' + esc(fmtVal(r.ind, p.value)) : ''}`) + tipRow('Timing', timing(p.d));
+        g += `<circle cx="${sx(-p.d)}" cy="${yc + lane(p.k)}" r="5" fill="${cycleColor(p.k)}" stroke="var(--surface-chart)" stroke-width="2" data-tip="${esc(tip)}"/>`;
+      }
+      const miss = r.pts.filter(p => p.missed).map(p => cyc(p.k));
+      const sub = metric === 'zone' ? (r.n + miss.length ? `${r.n}/${r.n + miss.length} flagged${miss.length ? ' · missed ' + miss.join(' ') : ''}` : 'no data')
+        : r.n ? `${r.lead} lead · ${r.sync} sync · ${r.lag} lag` : 'no data';
+      g += `<text x="${W - RW + 4}" y="${yc - 2}" class="ll-med">${r.med == null ? (miss.length ? 'never flagged' : '—') : esc(timing(Math.round(r.med)))}</text><text x="${W - RW + 4}" y="${yc + 11}" class="ll-sub">${sub}</text></g>`;
+    });
+    host.querySelector('.ll-plot').innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Lead and lag of each indicator against the ${turn}">${g}</svg>`;
+    host.querySelector('.ll-legend').innerHTML = ks.map(k => `<span><i style="background:${cycleColor(k)}"></i>${cyc(k)} ${side} (${M.cycles.find(c => c.k === k)[side].date.slice(0, 4)})</span>`).join('') + `<span><i class="bar"></i>median of cycles</span><span><i class="rng"></i>range across cycles</span>`;
+    host.querySelector('.ll-stats').innerHTML = [['Led the turn', cnt(p => p.d > SYNC_DAYS), `turned more than ${SYNC_DAYS}d before the ${turn}`], ['In sync', cnt(p => Math.abs(p.d) <= SYNC_DAYS), `within ±${SYNC_DAYS}d of the ${turn}`], ['Lagged', cnt(p => p.d < -SYNC_DAYS), `turned more than ${SYNC_DAYS}d after`]]
+      .map(([l, n, h]) => `<div class="ll-stat"><span>${l}</span><b>${n}<small> / ${all.length}</small></b><em>${h}</em></div>`).join('')
+      + (metric === 'zone' ? `<div class="ll-stat wide"><span>By cycle — indicators that flagged the turn</span><b class="ll-bycyc">${ks.map(k => { const a = L.flatMap(r => r.pts.filter(p => p.k === k && (p.d != null || p.missed))); return `<i style="color:${cycleColor(k)}">${cyc(k)}</i> ${a.filter(p => p.d != null).length}/${a.length}`; }).join(' &nbsp; ')}</b><em>in the ${side} zone within ±${SYNC_DAYS}d of the ${turn} — the rest never got there</em></div>` : '')
+      + (metric === 'zone' ? '' : `<div class="ll-stat wide"><span>By cycle — share that led</span><b class="ll-bycyc">${ks.map(k => { const a = all.filter(p => p.k === k); return `<i style="color:${cycleColor(k)}">${cyc(k)}</i> ${a.length ? Math.round(a.filter(p => p.d > SYNC_DAYS).length / a.length * 100) : 0}%`; }).join(' &nbsp; ')}</b><em>indicator readings whose ${ownW} came first</em></div>`);
+    host.querySelector('.ll-note').innerHTML = metric === 'own'
+      ? `<b>How to read:</b> each dot is one cycle — where the indicator made its own ${ownW} for that cycle, relative to the day of the ${turn} (the centre line). The search window runs ${side === 'top' ? 'from the previous cycle bottom to this cycle bottom' : 'from this cycle top to the next cycle top'}. ${side === 'top'
+        ? 'A dot far to the left is a <i>divergence</i>: the indicator had already peaked and was making lower highs while price kept rising.'
+        : 'Most valuation indicators are price divided by a slow-moving average, so their low lands on the price low by construction — "in sync" here is expected, and a lead or lag is the informative case.'} The time axis is compressed away from the centre so both days and years fit.`
+      : `<b>How to read:</b> each dot is the first day the indicator entered its ${side === 'top' ? 'top' : 'bottom'} zone (its 4-year percentile ${side === 'top' ? '≥ 90' : '≤ 10'}) in the episode that caught the ${turn} — i.e. when it would first have flagged the turn. "Missed" = it was not in the zone within ±${SYNC_DAYS}d of the turn. Leads of a few weeks are useful; leads of many months mean it fired early and stayed there.`;
+    bindTips(host);
+  };
+  host.innerHTML = `<div class="card-h"><h3>Lead & lag vs price turns</h3><span class="sub">did each indicator turn before or after price? one dot per cycle · hover for dates · click a row to open the indicator</span></div>
+    <div class="ll-bar"><div class="seg" data-k="side">${[['top', '▲ Tops'], ['bottom', '▼ Bottoms']].map(([k, l]) => `<button data-v="${k}" aria-pressed="${llState.side === k}">${l}</button>`).join('')}</div>
+    <div class="seg" data-k="metric">${[['own', "Indicator's own peak / low"], ['zone', 'First zone signal']].map(([k, l]) => `<button data-v="${k}" aria-pressed="${llState.metric === k}">${l}</button>`).join('')}</div>
+    <div class="seg" data-k="sort">${[['time', 'Earliest first'], ['list', 'List order']].map(([k, l]) => `<button data-v="${k}" aria-pressed="${llState.sort === k}">${l}</button>`).join('')}</div></div>
+    <div class="ll-stats"></div><div class="ll-legend"></div><div class="ll-plot"></div><div class="note ll-note"></div>`;
+  host.querySelectorAll('.seg[data-k] button').forEach(b => b.onclick = () => { const k = b.parentElement.dataset.k; llState[k] = b.dataset.v; b.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); draw(); });
+  host.querySelector('.ll-plot').addEventListener('click', e => { const r = e.target.closest('[data-go]'); if (r) location.hash = r.dataset.go; });
+  draw();
+}
+
 // ───────── cross-indicator view ─────────
 export function render(main, ctx) {
   const { M } = ctx;
@@ -145,8 +216,9 @@ export function render(main, ctx) {
   const lastK = M.cycles.at(-1).k;
   main.innerHTML = `
   <div class="page-h"><div><h1>Cycle extremes</h1>
-    <p>Each indicator's peak and bottom per halving cycle, fitted across cycles with linear, log and (for ratio indicators) exponential trends — and checked: every cycle is re-predicted from earlier cycles only and compared with the naive guess "same as last cycle". Open an indicator for its chart and zone days.</p></div></div>
-  <div class="card"><div class="card-h"><h3>Peaks and bottoms by cycle</h3><span class="sub">* = not final · Lin / Log / Exp = projection by linear, log and exponential fit · hover a verdict for its errors</span></div>
+    <p>When each indicator turned relative to price, and each indicator's peak and bottom per halving cycle, fitted across cycles with linear, log and (for ratio indicators) exponential trends — and checked: every cycle is re-predicted from earlier cycles only and compared with the naive guess "same as last cycle". Open an indicator for its chart and zone days.</p></div></div>
+  <div class="card" id="ll-card"></div>
+  <div class="card mt"><div class="card-h"><h3>Peaks and bottoms by cycle</h3><span class="sub">* = not final · Lin / Log / Exp = projection by linear, log and exponential fit · hover a verdict for its errors</span></div>
     <div class="tbl-wrap compact"><table><thead><tr><th>Indicator</th><th>▲ Peaks C1 → ${cyc(lastK)}</th><th>Next peak (${cyc(rows[1].R.sides.peak.target)})</th><th>Peak fit</th><th class="bt-group">▼ Bottoms C1 → ${cyc(lastK)}</th><th>${cyc(rows[1].R.sides.bottom.target)} bottom projection</th><th>≈ price today</th><th>Bottom fit</th></tr></thead><tbody>
     ${rows.map(({ ind, R }) => `<tr class="click" data-go="#/ind/${ind.id}"><td><b>${esc(ind.name)}</b></td><td>${seq(ind, R, 'peak')}</td><td>${proj(ind, R.sides.peak)}</td><td>${skill(R.sides.peak)}</td>
       <td class="bt-group">${seq(ind, R, 'bottom')}</td><td>${proj(ind, R.sides.bottom)}</td><td class="n">${implied(R.sides.bottom)}</td><td>${skill(R.sides.bottom)}</td></tr>`).join('')}
@@ -159,5 +231,6 @@ export function render(main, ctx) {
       return `<tr class="click" data-go="#/ind/${ind.id}"><td><b>${esc(ind.name)}</b> <span class="note">${Z.bands[0].heat ? '4y percentile' : 'lines'}</span></td>${Z.rows.map(r => cell(r, bi)).join('')}<td class="bt-group"></td>${Z.rows.map(r => cell(r, ti)).join('')}</tr>`; }).join('')}
     </tbody></table></div>
     <div class="note" style="margin-top:8px">${cyc(M.cycles.at(-1).k)} is unfinished (day ${M.lastIdx - M.cycles.at(-1).start}). Days counted only where the indicator has data.</div></div>`;
+  leadLagCard(main.querySelector('#ll-card'), M);
   bindTips(main);
 }

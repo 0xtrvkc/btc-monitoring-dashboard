@@ -3,7 +3,7 @@
 
 import {
   HALVINGS, syncHalvings, STALE_DAYS, DATA_WARN_DAYS, DATA_BAD_DAYS, INDICATORS, COMPOSITE, TOP_WINDOW_DAYS, RANK_WINDOW_DAYS, RANK_MIN_DAYS,
-  ADAPTIVE_TOP, ADAPTIVE_BOTTOM, BT,
+  ADAPTIVE_TOP, ADAPTIVE_BOTTOM, BT, ALL_INDICATORS,
 } from './config.js';
 
 export const DAY = 86400000;
@@ -455,6 +455,31 @@ export function sameCycleDay(M, ind, day) {
     if (j >= M.G.n || j >= c.end) return { k: c.k, v: null };
     return { k: c.k, v: M.series[ind.id][j], h: M.heat[ind.id][j], date: M.G.dates[j] };
   });
+}
+
+// Lead / lag of each indicator against each finished price turn.
+// d > 0 = the indicator turned d days BEFORE price, d < 0 = after.
+// metric 'own':  the indicator's own peak (or low) inside the cycle window.
+// metric 'zone': first day it entered its 4-year-percentile zone (≥ 90 / ≤ 10)
+//                in the episode that caught the turn; null if it never did.
+export const SYNC_DAYS = BT.NEAR;
+export function leadLag(M, side, metric = 'own') {
+  const out = [];
+  for (const ind of ALL_INDICATORS) {
+    if (ind.only && ind.only !== side) continue;
+    const pts = M.backtest[ind.id].sides[side].rows.map(r => {
+      let d = null, date = null, value = null;
+      if (metric === 'own' && r.own) { d = -r.own.lagDays || 0; date = r.own.date; value = r.own.value; }
+      if (metric === 'zone' && r.adaptive.status === 'ok' && r.adaptive.grade !== 'missed') { d = r.adaptive.lead || 0; date = r.adaptive.signalDate; }
+      return { k: r.k, d, date, value, extDate: r.extDate, extPrice: r.extPrice, missed: metric === 'zone' && r.adaptive.status === 'ok' && r.adaptive.grade === 'missed' };
+    });
+    const ds = pts.filter(p => p.d != null).map(p => p.d);
+    const med = ds.length ? median(ds) || 0 : null;
+    const lead = ds.filter(d => d > SYNC_DAYS).length, sync = ds.filter(d => Math.abs(d) <= SYNC_DAYS).length, lag = ds.filter(d => d < -SYNC_DAYS).length;
+    const recent = pts.filter(p => p.d != null).slice(-2).map(p => p.d);
+    out.push({ ind, pts, med, n: ds.length, lead, sync, lag, recent });
+  }
+  return out;
 }
 
 export { dayStr, dayNum };

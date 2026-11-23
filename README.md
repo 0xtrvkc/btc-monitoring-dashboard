@@ -41,7 +41,9 @@ VIEWS
                      (12 o'clock = halving), radius = value or 4-year percentile.
                      Replay / scrub by day since halving, focus one cycle, small
                      multiples of every indicator.
-  Cycle extremes     Every indicator's ▲ peak and ▼ bottom per cycle, fitted across
+  Cycle extremes     Lead & lag chart: did each indicator peak / bottom (or first
+                     flag its zone) before or after the price top / bottom, per cycle.
+                     Every indicator's ▲ peak and ▼ bottom per cycle, fitted across
                      cycles (linear y = a·cycle + b, log y = a·ln(cycle) + b as in the
                      MVRV dashboard, and exponential for ratio indicators) and
                      projected to the next cycle, with the BTC price that projection
