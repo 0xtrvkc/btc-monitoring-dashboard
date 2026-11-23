@@ -13,7 +13,7 @@ export function render(main, ctx) {
   <div class="page-h"><div><h1>Top & bottom zones</h1>
     <p>Two ways to ask "is it a bottom/top?": <b>conventional lines</b> (published thresholds) and <b>adaptive zones</b> (in the cheapest/hottest 10% of the indicator's own last 4 years — no fitted numbers, so it adjusts as cycles shrink).</p></div></div>
 
-  <div class="card"><div class="card-h"><h3>Zone map since 2012</h3><span class="sub">one column per week · hover for values · red line = price top, blue = price bottom</span>
+  <div class="card"><div class="card-h"><h3>Zone map since 2012</h3><span class="sub">one column per week · hover for values · red line = price top, blue = price bottom · ▼▲ = days between them</span>
     <div class="right"><div class="seg" id="colorby"><button data-c="heat" aria-pressed="${state.color === 'heat'}">4y percentile</button><button data-c="classic" aria-pressed="${state.color === 'classic'}">Conventional zone</button></div></div></div>
     <div id="map" style="position:relative"></div>
     <div class="legend" style="margin-top:10px" id="map-legend"></div>
@@ -43,7 +43,7 @@ function drawZoneMap(host, M) {
   const rows = [COMPOSITE, ...INDICATORS];
   const from = M.G.index('2012-01-02'), to = M.lastIdx, wk = 7;
   const cols = Math.ceil((to - from + 1) / wk);
-  const labelW = 150, rowH = 19, padTop = 22;
+  const labelW = 150, rowH = 19, padTop = 44, spanY = 30;
   const width = host.clientWidth || 1200, cw = (width - labelW) / cols, H = padTop + rows.length * rowH + 4;
   const dpr = devicePixelRatio || 1;
   host.innerHTML = `<canvas width="${width * dpr}" height="${H * dpr}" style="width:${width}px;height:${H}px;display:block"></canvas>`;
@@ -78,15 +78,42 @@ function drawZoneMap(host, M) {
     }
     if (r === 0) { g.fillStyle = C.stroke; g.fillRect(labelW, y + rowH - 1, width - labelW, 1); }
   });
+  const xOf = i => labelW + ((Math.max(i, from) - from) / wk) * cw;
   for (const cy of M.cycles.filter(c => c.k >= 1)) {
     for (const [e, col] of [[cy.top, C.hot], [cy.bottom, C.cold]]) {
       if (!e || e.i < from) continue;
-      const x = labelW + ((e.i - from) / wk) * cw;
-      g.fillStyle = col; g.fillRect(x - 1, padTop - 6, 2.5, H - padTop + 6);
+      g.fillStyle = col; g.fillRect(xOf(e.i) - 1, spanY - 6, 2.5, H - spanY + 6);
     }
   }
+  // ── days between lines: one bracket per top→bottom (decline) and bottom→top (advance) ──
+  const ex = [];
+  for (const cy of M.cycles) { if (cy.top?.i >= 0) ex.push({ kind: 'top', ...cy.top }); if (cy.bottom) ex.push({ kind: 'bottom', ...cy.bottom }); }
+  ex.sort((a, b) => a.i - b.i);
+  const spans = [];
+  for (let j = 0; j < ex.length; j++) {
+    const a = ex[j], b = ex[j + 1] || { kind: 'today', i: to, date: M.G.dates[to], price: M.G.price[to], final: false, open: true };
+    if (b.i < from || b.i <= a.i) continue;
+    spans.push({ a, b, days: b.i - a.i, down: a.kind === 'top', x1: xOf(a.i), x2: xOf(b.i) });
+  }
+  g.font = `600 11px ${getComputedStyle(document.body).fontFamily}`; g.textAlign = 'center';
+  for (const s of spans) {
+    const col = s.down ? C.cold : C.hot, tentative = s.b.open || !s.b.final;
+    g.strokeStyle = col; g.lineWidth = 1.5; g.setLineDash(tentative ? [3, 3] : []);
+    g.beginPath(); g.moveTo(s.x1 + 3, spanY + 6); g.lineTo(s.x1 + 3, spanY + 9); g.lineTo(s.x2 - 3, spanY + 9); g.lineTo(s.x2 - 3, spanY + 6); g.stroke();
+    g.setLineDash([]);
+    const label = `${s.down ? '▼' : '▲'} ${s.days.toLocaleString('en-US')}d${s.b.open ? ' so far' : !s.b.final ? '*' : ''}`;
+    const short = `${s.days}d${s.b.open ? '+' : !s.b.final ? '*' : ''}`;
+    const fit = [label, short].find(t => g.measureText(t).width + 6 <= s.x2 - s.x1);
+    if (fit) { g.fillStyle = C.text2; g.fillText(fit, (s.x1 + s.x2) / 2, spanY + 2); }
+  }
+  g.lineWidth = 1;
+  const spanTip = s => `<div class="th">${s.b.open ? (s.down ? 'Since the top' : 'Since the bottom') : s.down ? 'Top → bottom (decline)' : 'Bottom → top (advance)'}</div>` +
+    tipRow('From', `${s.a.date} · ${usd(s.a.price)}`) + tipRow(s.b.open ? 'Today' : 'To', `${s.b.date} · ${usd(s.b.price)}`) +
+    tipRow('Days', s.days.toLocaleString('en-US') + (s.b.open ? ' so far' : '')) + tipRow('Price change', (s.b.price >= s.a.price ? '+' : '') + Math.round((s.b.price / s.a.price - 1) * 100).toLocaleString('en-US') + '%') +
+    (!s.b.open && !s.b.final ? `<div class="muted" style="margin-top:4px">* bottom not confirmed until the next halving</div>` : '');
   cv.addEventListener('mousemove', e => {
     const b = cv.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top;
+    if (y >= spanY - 12 && y < padTop - 2) { const s = spans.find(s => x >= s.x1 && x <= s.x2); if (s) { showTip(e.clientX, e.clientY, spanTip(s)); return; } }
     const r = Math.floor((y - padTop) / rowH), c = Math.floor((x - labelW) / cw);
     if (r < 0 || r >= rows.length || c < 0 || c >= cols) { hideTip(); return; }
     const ind = rows[r], i = Math.min(to, from + c * wk + wk - 1), v = valueAt(ind, i), h = M.heat[ind.id][i];
