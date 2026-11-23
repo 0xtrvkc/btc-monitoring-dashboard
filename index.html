@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>BTC Cycle Monitor</title>
+<meta name="description" content="Where is Bitcoin in its cycle? MVRV, NUPL and 15 more on-chain and price indicators, top/bottom zones, polar cycle comparison and an out-of-sample backtest.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='none' stroke='%230a84ff' stroke-width='3'/%3E%3Cpath d='M16 4a12 12 0 0 1 12 12' stroke='%23d55181' stroke-width='3' fill='none'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/app.css">
+<script>try{const t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+<script src="vendor/chart.umd.min.js"></script>
+<script src="vendor/chartjs-plugin-annotation.min.js"></script>
+</head>
+<body>
+<div class="window">
+  <header class="titlebar">
+    <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="title">BTC Cycle Monitor <small id="asof">loading…</small></div>
+    <div class="tb-spacer"></div>
+    <div id="tb-stats" class="row"></div>
+    <button class="btn" id="btn-jump" title="Jump to a view or indicator">Jump to… <kbd>⌘K</kbd></button>
+    <button class="btn" id="btn-theme" title="Toggle light / dark appearance">☀︎ Light</button>
+    <button class="btn" id="btn-export" title="Download a plain-text summary (paste into an LLM or keep as a record)">↓ Summary</button>
+  </header>
+  <nav class="sidebar" id="sidebar" aria-label="Views and indicators"></nav>
+  <main class="main" id="main" tabindex="-1">
+    <div class="overlay" id="loading"><div class="loading"><div class="spinner"></div><div id="loading-msg">Loading indicator data…</div><div class="note" id="loading-sub"></div></div></div>
+  </main>
+</div>
+<div class="overlay" id="palette-wrap" hidden>
+  <div class="palette" role="dialog" aria-label="Jump to">
+    <input id="palette-input" placeholder="Jump to a view or indicator…" autocomplete="off" spellcheck="false">
+    <ul id="palette-list"></ul>
+  </div>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
