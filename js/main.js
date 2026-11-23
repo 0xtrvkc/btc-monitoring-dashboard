@@ -9,15 +9,18 @@ import * as clock from './views/clock.js';
 import * as overlayView from './views/overlay.js';
 import * as backtest from './views/backtest.js';
 import * as method from './views/method.js';
+import * as valuation from './views/valuation.js';
+import { computeValuation, VAL_SCHEMES, VAL_HYPOTHESIS, valZone } from './valuation.js';
 
 const VIEWS = {
   where: { mod: overview, label: 'Where am I?', ico: '◎', key: '1' },
-  zones: { mod: zones, label: 'Top & bottom zones', ico: '⇅', key: '2' },
-  overlay: { mod: overlayView, label: 'Cycle overlay', ico: '≋', key: '3' },
-  clock: { mod: clock, label: 'Cycle clock', ico: '◷', key: '4' },
-  backtest: { mod: backtest, label: 'Backtest', ico: '✓', key: '5' },
+  valuation: { mod: valuation, label: 'Valuation zone', ico: '◈', key: '2' },
+  zones: { mod: zones, label: 'Top & bottom zones', ico: '⇅', key: '3' },
+  overlay: { mod: overlayView, label: 'Cycle overlay', ico: '≋', key: '4' },
+  clock: { mod: clock, label: 'Cycle clock', ico: '◷', key: '5' },
+  backtest: { mod: backtest, label: 'Backtest', ico: '✓', key: '6' },
   ind: { mod: indicator, label: 'Indicator', ico: '∿' },
-  method: { mod: method, label: 'Method & data', ico: 'ⓘ', key: '6' },
+  method: { mod: method, label: 'Method & data', ico: 'ⓘ', key: '7' },
 };
 
 const ctx = { M: null, W: null, issues: [], nav, rerender: () => route() };
@@ -34,10 +37,13 @@ function route() {
   const { view, arg } = parse();
   destroyCharts(); hideTip();
   const main = $('#main');
-  main.innerHTML = '';
+  main.innerHTML = '<div id="vstrip"></div><div id="view"></div>';
   main.scrollTop = 0;
   ctx.view = view; ctx.arg = arg;
-  try { VIEWS[view].mod.render(main, ctx, arg); }
+  try {
+    if (view !== 'valuation' && view !== 'method') main.querySelector('#vstrip').innerHTML = valuation.strip(ctx.M);
+    VIEWS[view].mod.render(main.querySelector('#view'), ctx, arg);
+  }
   catch (e) { console.error(e); main.innerHTML = `<div class="card"><h3>Something went wrong drawing this view</h3><pre class="mono">${esc(e.stack || e.message)}</pre></div>`; }
   renderSidebar();
   document.title = (view === 'ind' && byId(arg) ? byId(arg).name : VIEWS[view].label) + ' · BTC Cycle Monitor';
@@ -48,7 +54,7 @@ function renderSidebar() {
   const item = (hash, ico, lbl, val = '', dot = null) =>
     `<button class="side-item" data-go="#/${hash}" ${cur === hash ? 'aria-current="page"' : ''}>${dot ? `<span class="dot" style="background:${dot}"></span>` : `<span class="ico">${ico}</span>`}<span class="lbl">${esc(lbl)}</span>${val ? `<span class="val">${val}</span>` : ''}</button>`;
   let h = `<div class="side-h">Monitor</div>`;
-  for (const k of ['where', 'zones', 'overlay', 'clock', 'backtest']) h += item(k, VIEWS[k].ico, VIEWS[k].label, `<kbd>${VIEWS[k].key}</kbd>`);
+  for (const k of ['where', 'valuation', 'zones', 'overlay', 'clock', 'backtest']) h += item(k, VIEWS[k].ico, VIEWS[k].label, `<kbd>${VIEWS[k].key}</kbd>`);
   const groups = [...new Set(ALL_INDICATORS.map(x => x.group))];
   for (const g of groups) {
     h += `<div class="side-h">${esc(g)}</div>`;
@@ -115,6 +121,20 @@ function exportSummary() {
   line(`  Cycle heat (composite 4y percentile): ${W.heat.toFixed(1)} — ${heatLabel(W.heat)} (${W.heatN} indicators)`);
   line(`  In conventional bottom zone: ${W.counts.classicBottom}/${W.counts.classicN} · top zone: ${W.counts.classicTop}/${W.counts.classicN}`);
   line(`  In adaptive bottom zone (≤10th pct): ${W.counts.adaptiveBottom}/${W.counts.adaptiveN} · top zone (≥90th): ${W.counts.adaptiveTop}/${W.counts.adaptiveN}`);
+  line();
+  const V = computeValuation(M), sg = (v, d = 1) => (Number.isFinite(v) ? (v >= 0 ? '+' : '') + v.toFixed(d) + '%' : '—');
+  line('VALUATION ZONE (each measure vs its own previous 4 years; same rules as the MVRV dashboard)');
+  line(`  Zone (MVRV vs its previous 4 years): ${V.zone}`);
+  for (const g of V.gauges) line(`  ${g.label}: ${Number.isFinite(g.value) ? g.value.toFixed(2) : '—'} · ${Number.isFinite(g.pct) ? (g.key === 'heat' ? 'heat ' + g.value.toFixed(0) + '/100' : 'cheaper than ' + (100 - g.pct * 100).toFixed(1) + '% of the last 4 years') + ' (' + valZone(g.pct) + ')' : 'not enough history'}`);
+  const L0 = V.lazy('mvrv');
+  line('  Next 12 months after past days in each MVRV zone:');
+  for (const o of L0.outcomes) line(o.n ? `    ${o.zone}: median ${sg(o.median, 0)} · middle 80% ${sg(o.p10, 0)} to ${sg(o.p90, 0)} · up ${o.up.toFixed(0)}% of ${o.n} days in ${o.episodes} episodes · ${o.cycles.map(cyc).join(', ')}` : `    ${o.zone}: no past days`);
+  line(`  MVRV-scaled buying vs plain weekly DCA (${L0.dca.windows} rolling 4-year periods from ${L0.dca.first}):`);
+  for (const s of VAL_SCHEMES) { const x = L0.dca.summary[s.key]; line(`    ${s.key} ${s.label}: beat DCA in ${x.beat}/${x.n} · median ${sg(x.median)} · worst ${sg(x.worst)} · best ${sg(x.best)}`); }
+  const LH = V.lazy('heat');
+  line(`  Cycle Heat-scaled buying (${LH.dca.windows} periods): ` + VAL_SCHEMES.map(s => `${s.key} beat ${LH.dca.summary[s.key].beat}/${LH.dca.summary[s.key].n} median ${sg(LH.dca.summary[s.key].median)}`).join(' · '));
+  line(`  Tracked hypothesis (registered ${VAL_HYPOTHESIS.registered}): ${VAL_HYPOTHESIS.text}`);
+  line(`    Before registration: beat DCA in ${V.hypIn.beat}/${V.hypIn.n} · median ${sg(V.hypIn.median)} · since registration: ${V.hypLive.weeks} weeks${V.hypLive.weeks ? ' · ' + sg(V.hypLive.diff) + ' vs DCA' : ''} (read nothing until 52+ weeks)`);
   line();
   line('INDICATORS (value · 4y percentile · conventional zone · thresholds bottom/top)');
   for (const ind of INDICATORS) {

@@ -19,6 +19,15 @@ VIEWS
                      ring, Cycle Heat gauge, CoinTH's own checklists, price levels
                      that would flip each indicator, same-day-in-past-cycles table,
                      a tile per indicator.
+  Valuation zone     Port of the MVRV dashboard's tab, same rules: MVRV, price /
+                     200-week average and Mayer ranked vs their own last 4 years
+                     (cheapest 20% = Cheap, 5% = Very cheap; dearest 20% =
+                     Overheated), plus Cycle Heat. What the next 12 months looked
+                     like per zone (with episode counts), S1/S2/S3 scaled buying vs
+                     plain weekly DCA over rolling 4-year periods and per cycle —
+                     switchable to any of the four measures — and the tracked
+                     hypothesis registered 2026-11-22. A compact strip of the four
+                     gauges sits above every view.
   Top & bottom zones Weekly zone map of every indicator since 2012, breadth (how many
                      are in a zone each day), board with distance to each line.
   Cycle overlay      Every cycle on one x-axis (% of the halving interval, or days
@@ -40,7 +49,7 @@ VIEWS
                      zone bands, conventional + fitted lines, cycle overlay, clock,
                      per-cycle table, backtest by method.
 
-  ⌘K jump anywhere · 1–6 views · [ ] previous / next indicator · ↓ Summary = text export.
+  ⌘K jump anywhere · 1–7 views · [ ] previous / next indicator · ↓ Summary = text export.
 
 
 TWO KINDS OF ZONE
@@ -71,6 +80,7 @@ js/config.js               halvings + the indicator registry — add an indicato
 js/engine.js               pure analysis (grid, percentiles, cycles, zones, backtest)
 js/clock.js                polar cycle clock (SVG)
 js/overlay.js              cycle overlay vs price (two linked Chart.js panels)
+js/valuation.js            valuation zone engine (mirrors the MVRV dashboard's computeValuation)
 js/views/*.js              one file per view
 js/data.js                 loads data/*.json, falls back to the live API per series
 data/*.json                daily snapshots of the CoinTH API (column format)
