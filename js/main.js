@@ -168,7 +168,7 @@ function exportSummary() {
   line('PREDICTION CONSENSUS (median of all models; walk-forward tested on past cycles)');
   for (const [side, F] of [['bottom', PR.now.bottom], ['top', PR.now.top]]) {
     if (!F?.price) continue;
-    line(`  ${cyc(F.k)} ${side}${side === 'top' && F.future ? ' (early look)' : ''}: ${usd(F.price.v)}  middle half ${usd(F.price.lo)}–${usd(F.price.hi)}  · ${F.price.n} models${F.date ? `  · date ${dd(F.date.v)} (${dd(F.date.lo)} → ${dd(F.date.hi)})` : ''}${F.known && side === 'bottom' ? `  · low so far ${usd(F.known.p)} on ${M.G.dates[F.known.i]}` : ''}`);
+    line(`  ${side === 'top' && F.future ? `Next cycle (${cyc(F.k)}) top, early sketch` : `${cyc(F.k)} ${side}`}: ${usd(F.price.v)}  middle half ${usd(F.price.lo)}–${usd(F.price.hi)}  · ${F.price.n} models${F.date ? `  · date ${dd(F.date.v)} (${dd(F.date.lo)} → ${dd(F.date.hi)})` : ''}${F.known && side === 'bottom' ? `  · low so far ${usd(F.known.p)} on ${M.G.dates[F.known.i]}` : ''}`);
     const CS = PR.consScore[side + 'price']; line(`    same method on past cycles: ${CS.rows.filter(r => !r.na).map(r => `${cyc(r.k)} ${(r.err > 0 ? '+' : '') + (r.err * 100).toFixed(0)}%`).join(' · ') || '—'}`);
   }
   line();

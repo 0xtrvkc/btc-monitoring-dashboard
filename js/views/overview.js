@@ -284,7 +284,7 @@ function predStrip(M) {
   const part = (F, side) => {
     if (!F?.price) return '';
     const col = side === 'bottom' ? 'var(--cold)' : 'var(--hot)';
-    return `<div class="pv-strip-item"><span class="kicker" style="color:${col}">${side === 'bottom' ? '▼' : '▲'} ${cyc(F.k)} ${side}${side === 'top' && F.future ? ' · early look' : ''}</span>
+    return `<div class="pv-strip-item"><span class="kicker" style="color:${col}">${side === 'top' && F.future ? `▲ Next cycle (${cyc(F.k)}) top · early sketch` : `${side === 'bottom' ? '▼' : '▲'} ${cyc(F.k)} ${side}`}</span>
       <b class="num" style="font-size:18px">${usd(F.price.v, true)}</b><span class="note">${usd(F.price.lo, true)}–${usd(F.price.hi, true)}${F.date ? ` · ${d(F.date.lo)} → ${d(F.date.hi)}` : ''} · ${F.price.n} models${side === 'bottom' && F.known ? ` · low so far ${usd(F.known.p, true)}` : ''}</span></div>`;
   };
   return `<div class="card mt pv-strip"><div class="card-h" style="margin:0"><h3>Prediction consensus</h3><span class="sub">median of every model, tested walk-forward on past cycles</span></div>

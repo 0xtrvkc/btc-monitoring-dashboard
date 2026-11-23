@@ -26,7 +26,7 @@ export function render(main, ctx) {
   <div class="grid g2">${consensusCard(M, P, 'bottom', B, price)}${consensusCard(M, P, 'top', T, price)}</div>
 
   <div class="card mt"><div class="card-h"><h3>Every forecast vs what happened</h3>
-    <span class="sub">boxes = consensus forecast (middle half of the models: price range × date window), made ${PRED.BOTTOM_ASOF} days after each top for bottoms and ${PRED.TOP_ASOF} days after each halving for tops · dashed = live · ▲▼ = actual turns · hover a box</span></div>
+    <span class="sub">boxes = consensus forecast (middle half of the models: price range × date window), made ${PRED.BOTTOM_ASOF} days after each top for bottoms and ${PRED.TOP_ASOF} days after each halving for tops · dashed = open forecasts (not yet resolved) · ▲▼ = actual turns · hover a box</span></div>
     <div style="height:470px"><canvas id="pv-overview"></canvas></div>
     <div class="legend" style="margin-top:8px"><span><i style="background:var(--cold)"></i>bottom forecast</span><span><i style="background:var(--hot)"></i>top forecast</span><span><i style="background:var(--text)"></i>BTC price</span><span class="muted">a box that contains its triangle = the consensus got price and timing right</span></div></div>
 
@@ -41,7 +41,7 @@ export function render(main, ctx) {
     <div class="grid g3" id="pv-replay-t"></div></div>
 
   <div class="grid g-wide mt pv-low">
-    <div class="card"><div class="card-h"><h3>Live track record</h3><span class="sub">the consensus as logged each day by the daily job — real out-of-sample, cannot be revised</span></div><div id="pv-log"></div></div>
+    <div class="card"><div class="card-h"><h3>Forecast log</h3><span class="sub">the consensus as logged each day by the daily job — real out-of-sample, cannot be revised</span></div><div id="pv-log"></div></div>
     <div class="card"><div class="card-h"><h3>How to read this</h3></div>${notes(P)}</div>
   </div>`;
 
@@ -67,14 +67,14 @@ function consensusCard(M, P, side, F, price) {
   const future = !isB && F.future;
   const h = HALVINGS[F.k - 1];
   return `<div class="card pv-cons ${side}">
-    <div class="card-h"><h3 style="color:${col}">${isB ? '▼' : '▲'} ${cyc(F.k)} ${isB ? 'bottom' : 'top'}${future ? ' · early look' : ''}</h3><span class="sub">${F.price.n} model${F.price.n > 1 ? 's' : ''} · as of ${M.G.dates[M.lastIdx]}</span></div>
+    <div class="card-h"><h3 style="color:${col}">${isB ? `▼ ${cyc(F.k)} bottom <span class="muted" style="font-weight:400">· current cycle</span>` : future ? `▲ Next cycle (${cyc(F.k)}) top <span class="muted" style="font-weight:400">· early sketch</span>` : `▲ ${cyc(F.k)} top`}</h3><span class="sub">${F.price.n} model${F.price.n > 1 ? 's' : ''} · as of ${M.G.dates[M.lastIdx]}</span></div>
     <div class="pv-cons-grid">
       <div><div class="kicker">Consensus price</div><div class="big" style="color:${col}">${usd(F.price.v, true)}</div>
         <div class="note">middle half ${usd(F.price.lo, true)}–${usd(F.price.hi, true)}<br>all models ${usd(F.price.min, true)}–${usd(F.price.max, true)}<br>${pct(F.price.v / price - 1)} vs today ${usd(price, true)}</div></div>
       <div><div class="kicker">Date window</div>${F.date ? `<div class="big" style="font-size:22px">${monYr(M, F.date.v)}</div><div class="note">middle half ${shortDate(M, F.date.lo)} → ${shortDate(M, F.date.hi)}${F.date.v < M.lastIdx ? '<br><b>median date already passed</b>' : `<br>${F.date.v - M.lastIdx} days from now`}</div>` : '<div class="note">—</div>'}</div>
     </div>
     ${isB && known ? `<div class="callout" style="margin-top:12px">Lowest close since the top: <b>${usd(known.p, true)}</b> on ${M.G.dates[known.i]}. <b>${capped} of ${ids.length}</b> models put the bottom at or above that — they say the low may already be in; the rest expect lower.</div>` : ''}
-    ${future ? `<div class="callout" style="margin-top:12px">The ${cyc(F.k)} halving is ${h?.confirmed ? '' : 'estimated for '}<b>${h?.date || '—'}</b>. Only the diminishing-returns models can run before it; anchor models switch on ${PRED.TOP_ASOF} days after it. ${F.price.n < 3 ? '<b>Too few models for a real consensus — treat as a sketch.</b>' : ''}</div>` : ''}
+    ${future ? `<div class="callout" style="margin-top:12px">We are still in ${cyc(F.k - 1)} — this is a forecast for the <b>next</b> cycle, which starts at the ${h?.confirmed ? '' : 'estimated '}halving on <b>${h?.date || '—'}</b>. Only the diminishing-returns models can run before it; anchor models switch on ${PRED.TOP_ASOF} days after it. ${F.price.n < 3 ? '<b>Too few models for a real consensus — treat as a sketch.</b>' : ''}</div>` : ''}
     <div class="note" style="margin-top:10px">Same consensus on past cycles: price ${past || '—'}${pastD ? ` · date ${pastD}` : ''}.</div>
   </div>`;
 }
@@ -91,14 +91,14 @@ function overviewChart(M, P, canvas) {
     let xa = F.date ? F.date.lo : F.asOf, xb = F.date ? F.date.hi : F.asOf + 365;
     if (xb - xa < 50) { const mid = (xa + xb) / 2; xa = mid - 25; xb = mid + 25; } // keep narrow windows visible
     const err = actual ? F.price.v / actual.price - 1 : null, derr = actual && F.date ? F.date.v - actual.i : null;
-    const html = `<div class='th'>${cyc(k)} ${side} · ${live ? 'live forecast' : 'forecast made ' + idxDate(M, F.asOf)}</div>` +
+    const html = `<div class='th'>${cyc(k)} ${side} · ${live ? (side === 'top' && F.future ? 'next cycle · early sketch made today' : 'open forecast · made today') : 'forecast made ' + idxDate(M, F.asOf)}</div>` +
       tipRow('Consensus', usd(F.price.v, true)) + tipRow('Middle half', `${usd(F.price.lo, true)}–${usd(F.price.hi, true)}`) +
       (F.date ? tipRow('Date', `${idxDate(M, F.date.v)} (${idxDate(M, F.date.lo)} → ${idxDate(M, F.date.hi)})`) : '') +
       (actual ? tipRow('Actual', `${usd(actual.price, true)} on ${idxDate(M, actual.i)}`) + tipRow('Miss', `${sPct(err)}${fin(derr) ? ' · ' + sDays(derr) : ''}`) : '') + tipRow('Models', F.price.n);
     ann[key] = { type: 'box', xMin: xa, xMax: xb, yMin: F.price.lo, yMax: F.price.hi, backgroundColor: col + (live ? '26' : '38'), borderColor: col, borderWidth: 1.6, borderDash: live ? [5, 4] : [], borderRadius: 3 };
     hits.push({ xa, xb, lo: F.price.lo, hi: F.price.hi, html });
     if (F.date) ann[key + 'm'] = { type: 'point', xValue: F.date.v, yValue: F.price.v, radius: 3.5, backgroundColor: col, borderColor: C.surface, borderWidth: 1.5, pointStyle: 'rectRot' };
-    if (live) ann[key + 'l'] = { type: 'label', xValue: (xa + xb) / 2, yValue: side === 'bottom' ? F.price.lo : F.price.hi, position: { x: 'center', y: side === 'bottom' ? 'start' : 'end' }, yAdjust: side === 'bottom' ? 6 : -6, content: `${cyc(k)} ${side} · live`, color: col, font: { size: 11, weight: '600' } };
+    if (live) ann[key + 'l'] = { type: 'label', xValue: (xa + xb) / 2, yValue: side === 'bottom' ? F.price.lo : F.price.hi, position: { x: 'center', y: side === 'bottom' ? 'start' : 'end' }, yAdjust: side === 'bottom' ? 6 : -6, content: side === 'top' && F.future ? `Next cycle (${cyc(k)}) top · early sketch` : `${cyc(k)} ${side} · open forecast`, color: col, font: { size: 11, weight: '600' } };
   };
   for (const t of P.tests.bottom) box('b' + t.k, 'bottom', t.k, t.F, t.actual, false);
   for (const t of P.tests.top) box('t' + t.k, 'top', t.k, t.F, t.actual, false);
@@ -181,7 +181,7 @@ function table(M, P, side, kind, title) {
   const consRow = `<tr class="pv-consrow"><td><b>Consensus</b> <span class="muted" style="font-size:11px">median of all non-baseline models</span></td>${CS.rows.map(r => (r.na ? '<td class="n">—</td>' : `<td class="n"><span class="pv-err" style="background:${errBg(kind, r.abs)}">${kind === 'price' ? sPct(r.err) : sDays(r.err)}</span>${r.inIQR ? ' <span title="actual inside the middle half of the models" style="color:var(--cold)">●</span>' : ''}</td>`)).join('')}
     <td class="n num"><b>${miss(kind, CS.mae)}</b><span class="muted" style="font-size:11px"> /${CS.n}</span></td><td></td>
     <td class="n"><b>${live?.[kind] ? (kind === 'price' ? usd(live[kind].v, true) : shortDate(M, live[kind].v)) : '—'}</b></td></tr>`;
-  return `<div class="pv-tbl-h">${title}</div><div class="tbl-wrap compact"><table class="pv-tbl"><thead><tr><th>Model</th>${tests.map(t => `<th class="n" title="forecast made ${idxDate(M, t.asOf)}">${cyc(t.k)} miss</th>`).join('')}<th class="n" title="typical miss across tests (geometric for price) / number of tests">Typical miss</th><th class="n" title="tests where it missed by less than the 'same as last cycle' baseline">Beats baseline</th><th class="n">Live ${live ? cyc(live.k) : ''}</th></tr></thead>
+  return `<div class="pv-tbl-h">${title}</div><div class="tbl-wrap compact"><table class="pv-tbl"><thead><tr><th>Model</th>${tests.map(t => `<th class="n" title="forecast made ${idxDate(M, t.asOf)}">${cyc(t.k)} miss</th>`).join('')}<th class="n" title="typical miss across tests (geometric for price) / number of tests">Typical miss</th><th class="n" title="tests where it missed by less than the 'same as last cycle' baseline">Beats baseline</th><th class="n" title="${live?.future ? 'Forecast for the next cycle, made today — the cycle has not started yet' : 'Forecast still open — the turn has not been confirmed yet'}">${live ? (live.future ? `Next cycle ${cyc(live.k)}<br><span class='muted'>early sketch</span>` : `Open forecast<br><span class='muted'>${cyc(live.k)}</span>`) : 'Open forecast'}</th></tr></thead>
     <tbody>${consRow}${body}</tbody></table></div>`;
 }
 
