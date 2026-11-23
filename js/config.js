@@ -22,6 +22,10 @@ export const HALVINGS = [
 export const CYCLE_COLORS = { 0: '#8e8e93', 1: '#9085e9', 2: '#199e70', 3: '#c98500', 4: '#d55181', 5: '#3987e5', 6: '#d95926' };
 export const CYCLE_DASH = { 0: [2, 3], 1: [2, 3], 2: [7, 4], 3: [12, 3, 2, 3], 4: [], 5: [], 6: [] };
 
+// Freshness: an indicator is stale when its source trails the newest price by
+// more than STALE_DAYS; the whole dataset is old after DATA_WARN/DATA_BAD days.
+export const STALE_DAYS = 3, DATA_WARN_DAYS = 3, DATA_BAD_DAYS = 7;
+
 export const HALVING_BLOCKS = 210000;
 const HALVING_DAYS = 1458; // 210,000 blocks × 10 min — used only when nothing better is known
 

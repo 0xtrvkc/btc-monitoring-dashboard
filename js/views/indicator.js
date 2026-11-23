@@ -14,7 +14,7 @@ export function render(main, ctx, id) {
   const i = M.lastIdx, v = M.series[ind.id][i], h = M.heat[ind.id][i];
   const zone = ind.id === 'heat' ? (v <= ind.bottom ? 'bottom' : v >= ind.top ? 'top' : 'mid') : classicZone(ind, v);
   const nz = namedZone(ind, v);
-  const B = M.backtest[ind.id].sides;
+  const B = M.backtest[ind.id].sides, fr = M.fresh?.[ind.id];
   const ids = ALL_INDICATORS.map(x => x.id), j = ids.indexOf(ind.id);
   const prev = ids[(j - 1 + ids.length) % ids.length], next = ids[(j + 1) % ids.length];
   const fitted = side => B[side].rows.at(-1)?.insample?.thrDisplay;
@@ -39,7 +39,7 @@ export function render(main, ctx, id) {
     <button class="btn" data-go="#/overlay/${ind.id}">≋ Overlay</button><button class="btn" data-go="#/clock/${ind.id}">◷ Cycle clock</button><button class="btn" data-go="#/backtest/${ind.id}">✓ Backtest</button></div></div>
 
   <div class="grid g4">
-    <div class="card"><div class="kicker">Now · ${M.G.dates[i]}</div><div class="big" style="margin:6px 0">${fmtVal(ind, v)}</div>${chip(zone, nz ? nz.label : null)}</div>
+    <div class="card"><div class="kicker">Now · ${M.G.dates[i]}</div><div class="big" style="margin:6px 0">${fmtVal(ind, v)}</div>${chip(zone, nz ? nz.label : null)}${fr?.stale ? ` <span class="chip warn" title="The source for this indicator has not updated; the value shown is carried forward up to 7 days, then left blank.">stale since ${fr.last || '—'}</span>` : ''}</div>
     <div class="card"><div class="kicker">4-year percentile</div><div class="big" style="margin:6px 0;color:${heatColor(h)}">${fin(h) ? h.toFixed(0) : '—'}</div>
       <div style="margin:8px 0 6px">${heatbar(h)}</div><div class="note">${heatLabel(h)} · adaptive zone: ${adaptiveZone(h) || '—'}</div></div>
     <div class="card"><div class="kicker" style="margin-bottom:8px">Conventional lines</div>${lineBlock('bottom')}${lineBlock('top')}</div>

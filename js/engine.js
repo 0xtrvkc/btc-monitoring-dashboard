@@ -2,7 +2,7 @@
 // (scripts/check_engine.mjs) so every number can be checked headless.
 
 import {
-  HALVINGS, syncHalvings, INDICATORS, COMPOSITE, TOP_WINDOW_DAYS, RANK_WINDOW_DAYS, RANK_MIN_DAYS,
+  HALVINGS, syncHalvings, STALE_DAYS, DATA_WARN_DAYS, DATA_BAD_DAYS, INDICATORS, COMPOSITE, TOP_WINDOW_DAYS, RANK_WINDOW_DAYS, RANK_MIN_DAYS,
   ADAPTIVE_TOP, ADAPTIVE_BOTTOM, BT,
 } from './config.js';
 
@@ -17,7 +17,11 @@ const fin = Number.isFinite;
 export function buildGrid(raw, priceSrc = 'mayer') {
   const master = raw[priceSrc] || raw.mvrv || Object.values(raw)[0];
   const first = dayNum('2011-01-01');
-  const last = dayNum(master.dates.at(-1));
+  // The grid ends at the date most sources have reached (median of their last
+  // dates): one source that stops updating cannot freeze the dashboard, and one
+  // that runs a day ahead does not mix days.
+  const ends = Object.values(raw).filter(f => f?.dates?.length).map(f => dayNum(f.dates.at(-1))).sort((a, b) => a - b);
+  const last = ends.length ? ends[Math.floor((ends.length - 1) / 2)] : dayNum(master.dates.at(-1));
   const n = last - first + 1;
   const dates = Array.from({ length: n }, (_, i) => dayStr(first + i));
   const price = new Float64Array(n).fill(NaN);
@@ -132,13 +136,27 @@ export const cycleOf = (cycles, i) => { for (let j = cycles.length - 1; j >= 0; 
 
 // ───────────────────────── model ─────────────────────────
 
+// Typical spacing in days between the last few rows of a data file.
+export function cadence(f) {
+  const d = f?.dates?.slice(-9) || []; if (d.length < 3) return 1;
+  const g = d.slice(1).map((x, j) => (Date.parse(x) - Date.parse(d[j])) / 864e5).sort((a, b) => a - b);
+  return Math.max(1, Math.round(g[Math.floor(g.length / 2)]));
+}
+
 export function buildModel(raw, latest = null) {
   const t0 = Date.now();
   const G = buildGrid(raw);
   syncHalvings(latest?.halvings, G.dates[G.n - 1]);
   const cycles = buildCycles(G);
-  const series = {}, heat = {};
+  const series = {}, heat = {}, fresh = {};
+  const lastPrice = lastValid(G.price);
   for (const ind of INDICATORS) {
+    // Freshness: how many days the indicator's source trails the newest price.
+    const f = raw[ind.src], end = ind.id === 'rsi-m' ? lastPrice : (f?.dates.length ? G.index(f.dates.at(-1)) : -1);
+    const lag = end < 0 ? Infinity : lastPrice - end;
+    // Allow for the source's own cadence (production cost is published every 4 days).
+    const allow = STALE_DAYS + (ind.id === 'rsi-m' ? 0 : cadence(f) - 1);
+    fresh[ind.id] = { last: end >= 0 ? G.dates[Math.min(end, G.n - 1)] : null, lag, allow, stale: lag > allow, end };
     series[ind.id] = indicatorSeries(G, ind, raw);
     const pct = rollingPercentile(series[ind.id]);
     heat[ind.id] = ind.dir > 0 ? pct : pct.map(v => (fin(v) ? 100 - v : NaN));
@@ -148,13 +166,14 @@ export function buildModel(raw, latest = null) {
   const comp = new Float64Array(G.n).fill(NaN), compN = new Uint8Array(G.n);
   for (let i = 0; i < G.n; i++) {
     let s = 0, c = 0;
-    for (const m of members) { const v = heat[m.id][i]; if (fin(v)) { s += v; c++; } }
+    for (const m of members) { if (fresh[m.id].stale && i > fresh[m.id].end) continue; const v = heat[m.id][i]; if (fin(v)) { s += v; c++; } }
     compN[i] = c;
     if (c >= 6) comp[i] = s / c;
   }
   series.heat = comp;
   heat.heat = comp; // the composite is already on a 0–100 heat scale
-  const M = { G, cycles, series, heat, compN, members, latest, builtMs: 0 };
+  const M = { G, cycles, series, heat, compN, members, latest, fresh, builtMs: 0 };
+  M.stale = INDICATORS.filter(x => fresh[x.id].stale);
   M.lastIdx = lastValid(G.price);
   M.backtest = {};
   for (const ind of [COMPOSITE, ...INDICATORS]) {
@@ -439,3 +458,16 @@ export function sameCycleDay(M, ind, day) {
 }
 
 export { dayStr, dayNum };
+
+// ───────────────────────── data health ─────────────────────────
+
+// How old the data is and which indicators have stopped updating.
+// level: 'ok' | 'warn' | 'bad'. `now` is injectable for tests.
+export function dataHealth(M, now = Date.now()) {
+  const lastDate = M.G.dates[M.lastIdx];
+  const ageDays = Math.floor((now - Date.parse(lastDate + 'T00:00:00Z')) / 864e5);
+  const fetchedAt = M.latest?.fetchedAt || null;
+  const level = ageDays > DATA_BAD_DAYS ? 'bad' : ageDays > DATA_WARN_DAYS || M.stale.length ? 'warn' : 'ok';
+  const stale = M.stale.map(ind => ({ ind, last: M.fresh[ind.id].last, lag: M.fresh[ind.id].lag, inHeat: !!ind.composite }));
+  return { lastDate, ageDays, fetchedAt, level, stale };
+}

@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  issues: write   # data-health issue (opened on problems, closed on recovery)
 
 concurrency:
   group: repo-data-push
@@ -26,10 +27,21 @@ jobs:
           node-version: '20'
 
       - name: Fetch every indicator from CoinTH and validate
+        id: fetch
         run: node scripts/fetch_cointh.mjs
+        env:
+          HEALTH_OUT: ${{ runner.temp }}/btc-health.json
 
       - name: Commit and push if data changed
         run: |
           git add data/
           AS_OF=$(node -e "const d=require('./data/nupl.json');console.log(d.dates.at(-1)+' (NUPL '+d.data.nupl.at(-1)+')')")
           scripts/push_with_retry.sh "chore: update indicator data — ${AS_OF}"
+
+      - name: Data health — open or close the GitHub issue
+        if: always()
+        run: node scripts/health_issue.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FETCH_OUTCOME: ${{ steps.fetch.outcome }}
+          HEALTH_OUT: ${{ runner.temp }}/btc-health.json

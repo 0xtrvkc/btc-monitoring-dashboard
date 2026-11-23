@@ -12,6 +12,8 @@
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const BASE = 'https://cointh.com/api/v1';
 const DATA_DIR = new URL('../data/', import.meta.url);
@@ -132,13 +134,13 @@ async function saveHistory(id) {
 async function main() {
   await mkdir(DATA_DIR, { recursive: true });
   const latest = { fetchedAt: new Date().toISOString(), source: 'cointh.com', indicators: {}, checklists: {} };
-  const failures = [];
+  const failures = [], errors = {};
 
   for (const id of HISTORY_IDS) {
     try {
       console.log(`${id}: ${await saveHistory(id)}`);
     } catch (e) {
-      failures.push(id);
+      failures.push(id); errors[id] = e.message;
       console.error(`${id}: FAILED (${e.message}) — kept previous file`);
     }
     try {
@@ -174,6 +176,8 @@ async function main() {
     console.warn(`halvings: FAILED (${e.message}) — ${oldLatest?.halvings ? 'kept previous' : 'page uses config.js'}`);
   }
   await writeFile(new URL('latest.json', DATA_DIR), JSON.stringify(latest));
+  // Run report for scripts/health_issue.mjs (not committed).
+  await writeFile(process.env.HEALTH_OUT || join(tmpdir(), 'btc-health.json'), JSON.stringify({ ranAt: new Date().toISOString(), failures, errors, halvingsOk: !!latest.halvings && latest.halvings !== oldLatest?.halvings }));
 
   if (failures.length === HISTORY_IDS.length) {
     console.error('Every indicator failed — not committing.');

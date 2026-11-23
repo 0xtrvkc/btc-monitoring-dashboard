@@ -1,5 +1,5 @@
 import { INDICATORS, ALL_INDICATORS, byId } from './config.js';
-import { buildModel, whereAmI, heatLabel, classicZone, VERDICTS } from './engine.js';
+import { buildModel, whereAmI, heatLabel, classicZone, VERDICTS, dataHealth } from './engine.js';
 import { loadAll } from './data.js';
 import { $, esc, fmtVal, usd, pct, heatColor, destroyCharts, hideTip, download, cyc } from './ui.js';
 import * as overview from './views/overview.js';
@@ -39,7 +39,8 @@ function route() {
   const { view, arg } = parse();
   destroyCharts(); hideTip();
   const main = $('#main');
-  main.innerHTML = '<div id="vstrip"></div><div id="view"></div>';
+  main.innerHTML = '<div id="health"></div><div id="vstrip"></div><div id="view"></div>';
+  main.querySelector('#health').innerHTML = healthBanner(ctx.M);
   main.scrollTop = 0;
   ctx.view = view; ctx.arg = arg;
   try {
@@ -49,6 +50,19 @@ function route() {
   catch (e) { console.error(e); main.innerHTML = `<div class="card"><h3>Something went wrong drawing this view</h3><pre class="mono">${esc(e.stack || e.message)}</pre></div>`; }
   renderSidebar();
   document.title = (view === 'ind' && byId(arg) ? byId(arg).name : VIEWS[view].label) + ' · BTC Cycle Monitor';
+}
+
+// Banner above every view when the data is old or some indicators stopped updating.
+function healthBanner(M) {
+  const H = dataHealth(M);
+  if (H.level === 'ok') return '';
+  const parts = [];
+  if (H.ageDays > 3) parts.push(`<b>Data is ${H.ageDays} days old</b> (last close ${H.lastDate}). The daily update may have stopped — check the repo's Actions tab, or use “Reload live from API” on the Method page.`);
+  if (H.stale.length) {
+    const inHeat = H.stale.filter(s => s.inHeat).length;
+    parts.push(`<b>${H.stale.length} indicator${H.stale.length > 1 ? 's' : ''} stopped updating:</b> ${H.stale.map(s => `<a data-go="#/ind/${s.ind.id}">${esc(s.ind.short || s.ind.name)}</a> (last ${s.last || 'never'})`).join(', ')}.${inHeat ? ` Left out of Cycle Heat after those dates.` : ''}`);
+  }
+  return `<div class="health ${H.level}" role="status"><span class="health-ico">${H.level === 'bad' ? '⛔' : '⚠︎'}</span><div>${parts.join('<br>')}</div></div>`;
 }
 
 function renderSidebar() {
@@ -61,8 +75,8 @@ function renderSidebar() {
   for (const g of groups) {
     h += `<div class="side-h">${esc(g)}</div>`;
     for (const ind of ALL_INDICATORS.filter(x => x.group === g)) {
-      const v = M.series[ind.id][i], hh = M.heat[ind.id][i];
-      h += item('ind/' + ind.id, '', ind.name, fmtVal(ind, v, true), heatColor(hh));
+      const v = M.series[ind.id][i], hh = M.heat[ind.id][i], fr = M.fresh?.[ind.id];
+      h += item('ind/' + ind.id, '', ind.name, fr?.stale ? `<span class="stale-tag" title="No new data since ${fr.last || 'ever'}">stale</span>` : fmtVal(ind, v, true), fr?.stale ? 'var(--muted)' : heatColor(hh));
     }
   }
   h += `<div class="side-h">About</div>` + item('method', VIEWS.method.ico, VIEWS.method.label);
@@ -73,7 +87,10 @@ function renderSidebar() {
 
 function renderTitlebar() {
   const { W } = ctx;
-  $('#asof').textContent = 'as of ' + W.date + ' UTC close';
+  const H = dataHealth(ctx.M), asof = $('#asof');
+  asof.textContent = 'as of ' + W.date + ' UTC close' + (H.ageDays > 3 ? ` · ${H.ageDays} days old` : '');
+  asof.className = 'asof-' + (H.ageDays > 7 ? 'bad' : H.ageDays > 3 ? 'warn' : 'ok');
+  asof.title = `Last daily close ${H.lastDate} (${H.ageDays} day${H.ageDays === 1 ? '' : 's'} ago). Snapshot fetched ${H.fetchedAt ? H.fetchedAt.slice(0, 16).replace('T', ' ') + ' UTC' : 'live'}. Normal lag is 1–2 days.`;
   $('#tb-stats').innerHTML =
     `<div class="tb-stat"><span>BTC</span><b>${usd(W.price)}</b><span>${pct(W.drawdown)} from ATH</span></div>` +
     `<div class="tb-stat"><span>${cyc(W.cycle.k)}</span><b>day ${W.day}</b><span>${(W.cyclePct * 100).toFixed(0)}% of cycle</span></div>` +

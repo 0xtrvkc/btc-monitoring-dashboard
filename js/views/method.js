@@ -47,6 +47,10 @@ export function render(main, ctx) {
     <div class="card"><div class="card-h"><h3>Snapshot</h3></div>
       <div class="t2">Fetched ${esc(L?.fetchedAt || '—')}<br>Latest close ${M.G.dates[M.lastIdx]}<br>${M.G.n.toLocaleString()} days · engine ${M.builtMs} ms</div>
       ${ctx.issues.length ? `<div class="callout" style="margin-top:8px">Missing: ${esc(ctx.issues.join('; '))}</div>` : ''}
+      <div class="tbl-wrap compact" style="margin-top:10px"><table><thead><tr><th>Indicator</th><th>Last data</th><th>Status</th></tr></thead><tbody>
+      ${INDICATORS.map(i => { const f = M.fresh[i.id]; return `<tr><td>${esc(i.short || i.name)}</td><td class="mono">${f.last || '—'}</td><td>${f.stale ? `<span class="chip warn">stale · ${Number.isFinite(f.lag) ? f.lag + 'd behind' : 'no data'}</span>` : '<span class="chip good">fresh</span>'}</td></tr>`; }).join('')}
+      </tbody></table></div>
+      <div class="note" style="margin-top:6px">Stale = more than 3 days behind the newest price (plus the source's own spacing — production cost is published every 4 days). Stale indicators are left out of Cycle Heat after their last date. The daily job also opens a GitHub issue (you get an email) when a source fails or goes stale, and closes it when the data recovers.</div>
       <div class="note" style="margin-top:8px">Source code: <a href="https://github.com/0xtrvkc/btc-monitoring-dashboard" target="_blank" rel="noopener">github.com/0xtrvkc/btc-monitoring-dashboard</a></div></div>
   </div></div>`;
   main.querySelector('#live').onclick = () => ctx.reload(true);

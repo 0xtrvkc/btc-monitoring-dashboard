@@ -114,4 +114,9 @@ read by the same daily job into data/latest.json. When a halving happens the nex
 cycle starts on its own; the following halving is estimated from recent block
 times. Nothing in the code needs editing for new cycles.
 
+If data stops: the title bar date turns amber (> 3 days old) or red (> 7), a banner
+names any indicator that stopped updating, and stale indicators drop out of Cycle
+Heat. The daily job (scripts/health_issue.mjs) opens a "data-health" GitHub issue
+when a source fails or goes stale — GitHub emails you — and closes it on recovery.
+
 Historical, descriptive analysis. Not financial advice.
