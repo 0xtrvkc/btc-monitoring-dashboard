@@ -1,6 +1,7 @@
 import { INDICATORS, ALL_INDICATORS, byId } from './config.js';
 import { buildModel, whereAmI, heatLabel, classicZone, VERDICTS, dataHealth } from './engine.js';
 import { loadAll } from './data.js';
+import { mountRadar } from './fetchstatus.js';
 import { computePredictions } from './predict.js';
 import { $, esc, fmtVal, usd, pct, heatColor, destroyCharts, hideTip, download, cyc } from './ui.js';
 import * as overview from './views/overview.js';
@@ -94,6 +95,7 @@ function renderTitlebar() {
   asof.textContent = 'as of ' + W.date + ' UTC close' + (H.ageDays > 3 ? ` · ${H.ageDays} days old` : '');
   asof.className = 'asof-' + (H.ageDays > 7 ? 'bad' : H.ageDays > 3 ? 'warn' : 'ok');
   asof.title = `Last daily close ${H.lastDate} (${H.ageDays} day${H.ageDays === 1 ? '' : 's'} ago). Snapshot fetched ${H.fetchedAt ? H.fetchedAt.slice(0, 16).replace('T', ' ') + ' UTC' : 'live'}. Normal lag is 1–2 days.`;
+  mountRadar($('#radar-slot'), ctx.M);
   $('#tb-stats').innerHTML =
     `<div class="tb-stat"><span>BTC</span><b>${usd(W.price)}</b><span>${pct(W.drawdown)} from ATH</span></div>` +
     `<div class="tb-stat"><span>${cyc(W.cycle.k)}</span><b>day ${W.day}</b><span>${(W.cyclePct * 100).toFixed(0)}% of cycle</span></div>` +

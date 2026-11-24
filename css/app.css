@@ -390,3 +390,26 @@ select.sel { height: 28px; border-radius: var(--r-sm); border: 1px solid var(--s
 .ll-note { margin-top: 6px; }
 .ll-bar { display: flex; gap: 10px; flex-wrap: wrap; margin: 2px 0 10px; }
 .ll-bar .seg button { white-space: nowrap; }
+
+/* ── data-fetch radar (title bar) ── */
+#radar-slot { display: inline-flex; align-items: center; }
+.radar { --c: var(--good); position: relative; width: 26px; height: 26px; margin-left: 2px; padding: 0; border: 0; background: none; cursor: pointer; border-radius: 50%; display: grid; place-items: center; }
+.radar:focus-visible { outline: 2px solid var(--accent, #0a84ff); outline-offset: 1px; }
+.radar[data-level="warn"] { --c: var(--warning); }
+.radar[data-level="bad"]  { --c: #ec835a; }
+.radar[data-level="new"]  { --c: var(--cold); }
+.radar-dot { position: relative; width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c); }
+.radar-dot::before, .radar-dot::after { content: ''; position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid var(--c); opacity: 0; animation: radar-ping 3.6s ease-out infinite; }
+.radar-dot::after { animation-delay: 1.8s; }
+.radar[data-level="new"] .radar-dot::before, .radar[data-level="new"] .radar-dot::after { animation-duration: 1.8s; }
+@keyframes radar-ping { 0% { transform: scale(1); opacity: .7; } 100% { transform: scale(3.2); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .radar-dot::before, .radar-dot::after { animation: none; } }
+.radar-key { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; background: var(--good); }
+.radar-key[data-level="warn"] { background: var(--warning); }
+.radar-key[data-level="bad"]  { background: #ec835a; }
+.radar-key[data-level="new"]  { background: var(--cold); }
+.tip:has(.radar-card) { max-width: 460px; }
+.radar-card { width: 430px; }
+.radar-card .tr { margin: 2px 0; }
+.radar-card .tr span, .radar-card .tr b { white-space: nowrap; }
+.radar-card .radar-note { margin-top: 6px; white-space: normal; line-height: 1.45; }

@@ -2,7 +2,7 @@ name: Update indicator data
 
 on:
   schedule:
-    - cron: '0 0 * * *'   # daily 00:00 UTC = 07:00 Bangkok (GitHub cron is always UTC)
+    - cron: '0 0 * * *'   # daily 00:00 UTC = 07:00 Bangkok (GitHub cron is always UTC; keep REFRESH_UTC_HOUR in js/config.js in sync)
   workflow_dispatch:
 
 permissions:

@@ -57,6 +57,9 @@ export const STATUS = { good: '#0ca30c', warning: '#fab219', serious: '#ec835a',
 // TOP = highest close within TOP_WINDOW_DAYS after the halving,
 // BOTTOM = lowest close after that top, up to the next halving.
 export const TOP_WINDOW_DAYS = 730;
+// Where the daily data job lives and when it is scheduled (must match .github/workflows/update-data.yml).
+export const REPO = '0xtrvkc/btc-monitoring-dashboard';
+export const REFRESH_UTC_HOUR = 0;   // 00:00 UTC = 07:00 Bangkok
 export const RANK_WINDOW_DAYS = 1461;      // 4-year rolling percentile
 export const RANK_MIN_DAYS = 730;          // need 2 years before ranking
 export const ADAPTIVE_TOP = 90;            // heat ≥ 90 → top zone
