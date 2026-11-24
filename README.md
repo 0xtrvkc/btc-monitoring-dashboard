@@ -106,7 +106,7 @@ js/data.js                 loads data/*.json, falls back to the live API per ser
 data/*.json                daily snapshots of the CoinTH API (column format)
 scripts/fetch_cointh.mjs   fetch + validate (never lets history go backwards/shrink)
 scripts/check_engine.mjs   headless run of the engine: `node scripts/check_engine.mjs [id]`
-.github/workflows/update-data.yml   daily 08:17 UTC refresh
+.github/workflows/update-data.yml   daily 00:00 UTC (07:00 Bangkok) refresh
 vendor/                    Chart.js 4.4.1 + annotation plugin (MIT)
 
 Run locally: `python3 -m http.server` in the repo, open http://localhost:8000
