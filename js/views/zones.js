@@ -13,7 +13,7 @@ export function render(main, ctx) {
   <div class="page-h"><div><h1>Top & bottom zones</h1>
     <p>Two ways to ask "is it a bottom/top?": <b>conventional lines</b> (published thresholds) and <b>adaptive zones</b> (in the cheapest/hottest 10% of the indicator's own last 4 years — no fitted numbers, so it adjusts as cycles shrink).</p></div></div>
 
-  <div class="card"><div class="card-h"><h3>Zone map since 2012</h3><span class="sub">one column per week · hover for values · red line = price top, blue = price bottom · ▼▲ = days between them</span>
+  <div class="card"><div class="card-h"><h3>Zone map since 2012</h3><span class="sub">one column per week · price below on the same axis · red = price top, blue = bottom · ▼▲ = days between · * = provisional</span>
     <div class="right"><div class="seg" id="colorby"><button data-c="heat" aria-pressed="${state.color === 'heat'}">4y percentile</button><button data-c="classic" aria-pressed="${state.color === 'classic'}">Conventional zone</button></div></div></div>
     <div id="map" style="position:relative"></div>
     <div class="legend" style="margin-top:10px" id="map-legend"></div>
@@ -44,9 +44,11 @@ function drawZoneMap(host, M) {
   const from = M.G.index('2012-01-02'), to = M.lastIdx, wk = 7;
   const cols = Math.ceil((to - from + 1) / wk);
   const labelW = 150, rowH = 19, padTop = 44, spanY = 30;
-  const width = host.clientWidth || 1200, cw = (width - labelW) / cols, H = padTop + rows.length * rowH + 4;
+  // price panel under the rows, on the same weekly x axis
+  const pTop = padTop + rows.length * rowH + 16, pH = 190, H = pTop + pH + 6;
+  const width = host.clientWidth || 1200, cw = (width - labelW) / cols;
   const dpr = devicePixelRatio || 1;
-  host.innerHTML = `<canvas width="${width * dpr}" height="${H * dpr}" style="width:${width}px;height:${H}px;display:block"></canvas>`;
+  host.innerHTML = `<canvas width="${width * dpr}" height="${H * dpr}" style="width:${width}px;height:${H}px;display:block"></canvas><div class="zm-cross" hidden></div>`;
   const cv = host.querySelector('canvas'), g = cv.getContext('2d');
   g.scale(dpr, dpr);
   g.font = `11.5px ${getComputedStyle(document.body).fontFamily}`;
@@ -79,10 +81,46 @@ function drawZoneMap(host, M) {
     if (r === 0) { g.fillStyle = C.stroke; g.fillRect(labelW, y + rowH - 1, width - labelW, 1); }
   });
   const xOf = i => labelW + ((Math.max(i, from) - from) / wk) * cw;
+  // ── BTC price (log) ──
+  const P = M.G.price;
+  let pMin = Infinity, pMax = 0;
+  for (let i = from; i <= to; i++) if (fin(P[i])) { pMin = Math.min(pMin, P[i]); pMax = Math.max(pMax, P[i]); }
+  const lMin = Math.log(pMin * 0.8), lMax = Math.log(pMax * 1.25);
+  const yOf = v => pTop + pH - ((Math.log(v) - lMin) / (lMax - lMin)) * pH;
+  g.fillStyle = C.text; g.textAlign = 'right'; g.font = `600 11.5px ${getComputedStyle(document.body).fontFamily}`;
+  g.fillText('BTC price', labelW - 10, pTop + 12);
+  g.font = `11px ${getComputedStyle(document.body).fontFamily}`;
+  for (const v of [10, 30, 100, 300, 1e3, 3e3, 1e4, 3e4, 1e5, 3e5, 1e6]) {
+    if (v < pMin * 0.8 || v > pMax * 1.25) continue;
+    const y = yOf(v); if (y < pTop + 22) continue;
+    g.fillStyle = C.grid; g.fillRect(labelW, Math.round(y), width - labelW, 1);
+    g.fillStyle = C.muted; g.fillText('$' + (v >= 1e3 ? v / 1e3 + 'K' : v), labelW - 10, y + 4);
+  }
+  g.fillStyle = C.stroke; g.fillRect(labelW, pTop - 8, width - labelW, 1);
+  g.strokeStyle = C.text; g.lineWidth = 1.3; g.lineJoin = 'round'; g.beginPath();
+  let pen = false;
+  for (let i = from; i <= to; i++) { if (!fin(P[i])) { pen = false; continue; } const x = xOf(i), y = yOf(P[i]); if (pen) g.lineTo(x, y); else { g.moveTo(x, y); pen = true; } }
+  g.stroke();
   for (const cy of M.cycles.filter(c => c.k >= 1)) {
     for (const [e, col] of [[cy.top, C.hot], [cy.bottom, C.cold]]) {
       if (!e || e.i < from) continue;
       g.fillStyle = col; g.fillRect(xOf(e.i) - 1, spanY - 6, 2.5, H - spanY + 6);
+    }
+  }
+  // turn markers + price labels on the price panel
+  g.font = `600 10.5px ${getComputedStyle(document.body).fontFamily}`;
+  for (const cy of M.cycles.filter(c => c.k >= 1)) {
+    for (const [e, col, up] of [[cy.top, C.hot, true], [cy.bottom, C.cold, false]]) {
+      if (!e || e.i < from || !fin(e.price)) continue;
+      const x = xOf(e.i), y = yOf(e.price), s = 5;
+      g.beginPath();
+      if (up) { g.moveTo(x, y - 3); g.lineTo(x - s, y - 3 - s * 1.6); g.lineTo(x + s, y - 3 - s * 1.6); }
+      else { g.moveTo(x, y + 3); g.lineTo(x - s, y + 3 + s * 1.6); g.lineTo(x + s, y + 3 + s * 1.6); }
+      g.closePath();
+      if (e.final) { g.fillStyle = col; g.fill(); } else { g.strokeStyle = col; g.lineWidth = 1.5; g.stroke(); }
+      const txt = usd(e.price, true) + (e.final ? '' : '*');
+      g.textAlign = x + 40 > width ? 'right' : 'left';
+      g.fillStyle = col; g.fillText(txt, x + (g.textAlign === 'right' ? -6 : 6), up ? y - 8 : y + 16);
     }
   }
   // ── days between lines: one bracket per top→bottom (decline) and bottom→top (advance) ──
@@ -111,16 +149,28 @@ function drawZoneMap(host, M) {
     tipRow('From', `${s.a.date} · ${usd(s.a.price)}`) + tipRow(s.b.open ? 'Today' : 'To', `${s.b.date} · ${usd(s.b.price)}`) +
     tipRow('Days', s.days.toLocaleString('en-US') + (s.b.open ? ' so far' : '')) + tipRow('Price change', (s.b.price >= s.a.price ? '+' : '') + Math.round((s.b.price / s.a.price - 1) * 100).toLocaleString('en-US') + '%') +
     (!s.b.open && !s.b.final ? `<div class="muted" style="margin-top:4px">* bottom not confirmed until the next halving</div>` : '');
+  const cross = host.querySelector('.zm-cross');
+  cross.style.cssText += `;top:${padTop - 4}px;height:${H - padTop + 4}px`;
+  // where a day sits in the cycle: days and % move since the last confirmed-or-provisional turn
+  const turns = ex.filter(t => t.i >= 0);
+  const priceTip = i => {
+    const last = turns.filter(t => t.i <= i).at(-1);
+    return `<div class="th">${M.G.dates[i]}</div>` + tipRow('BTC', usd(P[i])) +
+      (last ? tipRow(`Since ${last.kind === 'top' ? 'top' : 'bottom'} ${last.date}`, `${(i - last.i).toLocaleString('en-US')}d · ${pct(P[i] / last.price - 1)}`, last.kind === 'top' ? C.hot : C.cold) : '');
+  };
   cv.addEventListener('mousemove', e => {
     const b = cv.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top;
+    const inCols = x >= labelW && x < width;
+    cross.hidden = !inCols || y < padTop - 4; if (!cross.hidden) cross.style.left = Math.round(x) + 'px';
     if (y >= spanY - 12 && y < padTop - 2) { const s = spans.find(s => x >= s.x1 && x <= s.x2); if (s) { showTip(e.clientX, e.clientY, spanTip(s)); return; } }
+    if (y >= pTop - 8 && inCols) { const i = Math.min(to, Math.max(from, Math.round(from + ((x - labelW) / cw) * wk))); if (fin(P[i])) { showTip(e.clientX, e.clientY, priceTip(i)); return; } }
     const r = Math.floor((y - padTop) / rowH), c = Math.floor((x - labelW) / cw);
     if (r < 0 || r >= rows.length || c < 0 || c >= cols) { hideTip(); return; }
     const ind = rows[r], i = Math.min(to, from + c * wk + wk - 1), v = valueAt(ind, i), h = M.heat[ind.id][i];
     showTip(e.clientX, e.clientY, `<div class="th">${esc(ind.name)}</div>` + tipRow('Week ending', M.G.dates[i]) + tipRow('Value', fmtVal(ind, v)) +
       tipRow('4y percentile', fin(h) ? h.toFixed(0) : '—', heatColor(h)) + tipRow('Price', usd(M.G.price[i])));
   });
-  cv.addEventListener('mouseleave', hideTip);
+  cv.addEventListener('mouseleave', () => { hideTip(); cross.hidden = true; });
 }
 
 function drawBreadth(M) {

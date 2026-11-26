@@ -417,3 +417,6 @@ select.sel { height: 28px; border-radius: var(--r-sm); border: 1px solid var(--s
 .radar-card .tr { margin: 2px 0; }
 .radar-card .tr span, .radar-card .tr b { white-space: nowrap; }
 .radar-card .radar-note { margin-top: 6px; white-space: normal; line-height: 1.45; }
+
+/* zone map: crosshair across rows + price panel */
+.zm-cross { position: absolute; width: 1px; background: var(--text-2); opacity: .45; pointer-events: none; }
