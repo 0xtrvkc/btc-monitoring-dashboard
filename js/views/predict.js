@@ -1,5 +1,6 @@
 // Predictions: every top/bottom model, scored walk-forward, plus the consensus.
 import { HALVINGS } from '../config.js';
+import * as mc from './montecarlo.js';
 import { computePredictions, FAMILIES, PRED, median } from '../predict.js';
 import { esc, usd, pct, cyc, cycleColor, themeColors, plainChart, timePanel, group, pts, showTip, hideTip, tipRow, bindTips, compactNum, fin, cycleMarkers } from '../ui.js';
 
@@ -25,6 +26,8 @@ export function render(main, ctx) {
 
   <div class="grid g2">${consensusCard(M, P, 'bottom', B, price)}${consensusCard(M, P, 'top', T, price)}</div>
 
+  ${mc.card(M)}
+
   <div class="card mt"><div class="card-h"><h3>Every forecast vs what happened</h3>
     <span class="sub">boxes = consensus forecast (middle half of the models: price range × date window), made ${PRED.BOTTOM_ASOF} days after each top for bottoms and ${PRED.TOP_ASOF} days after each halving for tops · dashed = open forecasts (not yet resolved) · ▲▼ = actual turns · hover a box</span></div>
     <div style="height:470px"><canvas id="pv-overview"></canvas></div>
@@ -45,6 +48,7 @@ export function render(main, ctx) {
     <div class="card"><div class="card-h"><h3>How to read this</h3></div>${notes(P)}</div>
   </div>`;
 
+  mc.draw(M, main);
   overviewChart(M, P, main.querySelector('#pv-overview'));
   const drawCompare = () => { main.querySelector('#pv-compare').innerHTML = compare(M, P); bindTips(main.querySelector('#pv-compare')); forest(M, P); };
   main.querySelectorAll('#pv-tab button').forEach(b => b.onclick = () => { state.tab = b.dataset.t; main.querySelectorAll('#pv-tab button').forEach(x => x.setAttribute('aria-pressed', x === b)); drawCompare(); });

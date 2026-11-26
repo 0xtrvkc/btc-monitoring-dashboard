@@ -60,6 +60,13 @@ VIEWS
                      box vs the actual turn, model leaderboards, forest plot,
                      day-by-day replay, and a live track record that the daily job
                      appends to data/forecasts.json (never recomputed).
+                     Monte Carlo card: 5,000 paths to the next halving from a
+                     phase-aligned block bootstrap of past cycles (30-day blocks
+                     taken from the same number of days after the top — or after
+                     the halving, before the top is final — scaled to today's
+                     1-year volatility), next to a driftless random walk. Fan
+                     chart, probability of trading through key levels, and a
+                     walk-forward test of whether the bands actually held.
   Backtest           Every indicator × every completed top and bottom, four threshold
                      methods, a fit map (walk-forward vs hindsight) and a verdict:
                      Sharp · Correct · Overfit · Underfit (misses / loose), plus a
