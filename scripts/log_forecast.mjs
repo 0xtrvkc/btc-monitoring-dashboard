@@ -3,6 +3,7 @@
 // data/forecasts.json, one entry per data date. Run by the daily workflow after
 // the fetch. These entries are the live, out-of-sample track record: they are
 // written once and never recomputed, so later data or code can't revise them.
+// Also records a Monte Carlo summary (js/montecarlo.js, field `mc`).
 // A failure here only warns — it must never block the data update.
 
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
@@ -17,7 +18,16 @@ try {
   const raw = {};
   for (const f of readdirSync(DATA)) if (f.endsWith('.json') && !SKIP.has(f)) raw[f.slice(0, -5)] = JSON.parse(readFileSync(new URL(f, DATA), 'utf8'));
   const latest = existsSync(new URL('latest.json', DATA)) ? JSON.parse(readFileSync(new URL('latest.json', DATA), 'utf8')) : null;
-  const rec = forecastRecord(buildModel(raw, latest));
+  const M = buildModel(raw, latest);
+  const rec = forecastRecord(M);
+  // Monte Carlo summary — guarded on its own so a failure only drops this field
+  try {
+    const { mcRecord } = await import('../js/montecarlo.js');
+    const mc = mcRecord(M);
+    if (mc) rec.mc = mc;
+  } catch (e) {
+    console.warn(`monte carlo not logged: ${e.message}`);
+  }
   rec.loggedAt = new Date().toISOString();
   const log = existsSync(LOG) ? JSON.parse(readFileSync(LOG, 'utf8')) : [];
   if (log.some(r => r.date === rec.date)) {

@@ -25,6 +25,8 @@ export const MC = {
   H_MIN: 365, H_MAX: 730, // live horizon = days to next halving, clamped to this
   TEST_H: 365,      // walk-forward horizon
   TEST_EVERY: 30,   // walk-forward: one test every N days
+  MIN_SOURCES: 2,   // walk-forward headline: only tests with at least this many source cycles
+  LOG_DAY: 365,     // daily log also records the distribution at this horizon (the one the walk-forward tests)
   STEP: 3,          // fan-chart resolution (days)
   SEED: 20240420,
 };
@@ -113,10 +115,10 @@ function pathC(R, A, volNow, H, out) {
 function pathA(R, volNow, H, out) { const mu = -volNow * volNow / 2; for (let t = 0; t < H; t++) out[t] = mu + volNow * gauss(R); }
 
 // Run N paths; keep a price snapshot every `step` days plus min / argmin / max per path.
-function simulate(gen, N, H, p0, step, seed) {
-  const R = rng(seed), days = [];
-  for (let d = 0; d < H; d += step) days.push(d);
-  days.push(H);
+function simulate(gen, N, H, p0, step, seed, extra = []) {
+  const R = rng(seed), set = new Set([H, ...extra.filter(d => d > 0 && d < H)]);
+  for (let d = 0; d < H; d += step) set.add(d);
+  const days = [...set].sort((a, b) => a - b);
   const S = days.length, snap = new Float32Array(N * S), min = new Float64Array(N), minDay = new Int32Array(N), max = new Float64Array(N), end = new Float64Array(N);
   const buf = new Float64Array(H);
   for (let n = 0; n < N; n++) {
@@ -153,8 +155,8 @@ export function monteCarlo(M) {
   const H = Math.max(MC.H_MIN, Math.min(MC.H_MAX, c.end - t));
   const A = analogs(M, r, t, H, t);
   if (!A.list.length || !fin(A.volNow)) return null;
-  const C = simulate((R, o) => pathC(R, A, A.volNow, H, o), MC.N, H, p0, MC.STEP, MC.SEED);
-  const B = simulate((R, o) => pathA(R, A.volNow, H, o), MC.N, H, p0, MC.STEP, MC.SEED + 1);
+  const C = simulate((R, o) => pathC(R, A, A.volNow, H, o), MC.N, H, p0, MC.STEP, MC.SEED, [MC.LOG_DAY]);
+  const B = simulate((R, o) => pathA(R, A.volNow, H, o), MC.N, H, p0, MC.STEP, MC.SEED + 1, [MC.LOG_DAY]);
 
   // lowest close since the top (the provisional cycle bottom) — only once the top is final
   let knownLow = null;
@@ -214,12 +216,39 @@ export function mcBacktest(M) {
       pitC: rankOf(C.end, pE), pitA: rankOf(B.end, pE), minPitC: rankOf(C.minSorted, lo), minPitA: rankOf(B.minSorted, lo),
       medC: quant(C.end, 0.5) / p0 - 1, medA: quant(B.end, 0.5) / p0 - 1 });
   }
-  const score = key => {
-    const p = rows.map(x => x[key]);
+  const score = (rs, key) => {
+    const p = rs.map(x => x[key]);
     const n = p.length || 1;
     return { in90: p.filter(v => v >= 0.05 && v <= 0.95).length / n, in50: p.filter(v => v >= 0.25 && v <= 0.75).length / n, below: p.filter(v => v < 0.05).length / n, above: p.filter(v => v > 0.95).length / n };
   };
-  const v = { rows, H, every: MC.TEST_EVERY, n: rows.length, effN: Math.round(rows.length * MC.TEST_EVERY / H), C: score('pitC'), A: score('pitA'), minC: score('minPitC'), minA: score('minPitA') };
+  // Grouped by how many past cycles the replay could draw from. With one source
+  // every path is the same history plus noise, so those tests say little about
+  // today's run; the headline uses tests with MIN_SOURCES or more. The random
+  // walk is scored on the same tests so the comparison stays like for like.
+  const groupOf = rs => ({ n: rs.length, effN: Math.round(rs.length * MC.TEST_EVERY / H), from: rs[0]?.t, to: rs.at(-1)?.t,
+    C: score(rs, 'pitC'), A: score(rs, 'pitA'), minC: score(rs, 'minPitC'), minA: score(rs, 'minPitA') });
+  const bySources = [...new Set(rows.map(r => r.analogs.length))].sort().map(k => ({ sources: k, ...groupOf(rows.filter(r => r.analogs.length === k)) }));
+  const main = groupOf(rows.filter(r => r.analogs.length >= MC.MIN_SOURCES));
+  const v = { rows, H, every: MC.TEST_EVERY, minSources: MC.MIN_SOURCES, all: groupOf(rows), main, bySources };
   testMemo = { key: M.lastIdx, v };
   return v;
+}
+
+// ───────── daily log record ─────────
+// Compact summary for data/forecasts.json (written once per data date by the
+// daily job, never recomputed). Scored later against the actual price at the
+// horizon (day LOG_DAY, the walk-forward horizon) and at the next halving.
+export const MC_VERSION = 1; // bump when the method changes, so the track record can be split
+export function mcRecord(M) {
+  const R = monteCarlo(M); if (!R) return null;
+  const r0 = v => Math.round(v), r3 = v => Math.round(v * 1000) / 1000;
+  const at = (S, d) => { const s = S.days.indexOf(d); return s < 0 ? null : { p05: r0(S.q.p05[s]), p25: r0(S.q.p25[s]), p50: r0(S.q.p50[s]), p75: r0(S.q.p75[s]), p95: r0(S.q.p95[s]) }; };
+  const idxDate = i => new Date((M.G.first + i) * 864e5).toISOString().slice(0, 10);
+  return {
+    v: MC_VERSION, n: MC.N, phase: R.phase.kind, age: R.phase.age, sources: R.analogs.map(a => a.k), vol: r3(R.volNow * 100) / 100,
+    d365: { date: idxDate(R.t + MC.LOG_DAY), replay: at(R.C, MC.LOG_DAY), walk: at(R.A, MC.LOG_DAY) },
+    end: { date: idxDate(R.endIdx), replay: at(R.C, R.H), walk: at(R.A, R.H) },
+    pUp: { replay: r3(R.sumC.pUp), walk: r3(R.sumA.pUp) },
+    levels: R.levels.map(l => ({ L: r0(l.L), dir: l.dir, label: l.label, replay: r3(l.C), walk: r3(l.A) })),
+  };
 }

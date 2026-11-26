@@ -105,14 +105,24 @@ function fan(M, R, canvas) {
 }
 
 function testHtml(M, T) {
-  const row = (name, S, L, strong) => `<tr><td>${strong ? `<b>${name}</b>` : name}</td><td class="n">${strong ? '<b>' : ''}${pc(S.in90)}${strong ? '</b>' : ''}</td><td class="n">${pc(S.in50)}</td><td class="n">${pc(S.above)} / ${pc(S.below)}</td><td class="n">${pc(L.in90)}</td></tr>`;
-  const w = T.C.in90;
-  const verdict = w >= 0.85 ? `The replay's 90% band held ${pc(w)} of the time — about as wide as it claims.`
-    : `The replay's bands are <b>too narrow</b>: its 90% band held the actual price only ${pc(w)} of the time${T.C.above > T.C.below ? ', and misses were mostly to the upside' : T.C.below > T.C.above ? ', and misses were mostly to the downside' : ''}. Read its 90% band as roughly a ${pc(w)} band.`;
-  return `<div class="tbl-wrap compact"><table><thead><tr><th>Method</th><th class="n" title="target 90%">End in 90% band</th><th class="n" title="target 50%">End in 50% band</th><th class="n">Missed above / below</th><th class="n" title="the lowest close over the year, inside the 90% band of simulated lows">Low in 90% band</th></tr></thead>
-    <tbody>${row('Cycle replay', T.C, T.minC, true)}${row('Random walk', T.A, T.minA, false)}<tr><td class="muted">Target</td><td class="n muted">90%</td><td class="n muted">50%</td><td class="n muted">5% / 5%</td><td class="n muted">90%</td></tr></tbody></table></div>
+  const G = T.main, yr = i => (fin(i) ? M.G.dates[i].slice(0, 4) : '');
+  const cell = (v, strong) => `<td class="n">${strong ? '<b>' : ''}${pc(v)}${strong ? '</b>' : ''}</td>`;
+  const row = (name, S, L, strong, cls = '') => `<tr class="${cls}"><td>${name}</td>${cell(S.in90, strong)}${cell(S.in50)}<td class="n">${pc(S.above)} / ${pc(S.below)}</td>${cell(L.in90)}</tr>`;
+  const src = n => `${n} source cycle${n > 1 ? 's' : ''}`;
+  const groups = T.bySources.map(g => row(`<span class="muted">${src(g.sources)} <span style="font-size:11px">· ${g.n} · ${yr(g.from)}–${yr(g.to).slice(2)}</span></span>`, g.C, g.minC, false, 'muted')).join('');
+  const w = G.C.in90, wA = G.A.in90;
+  const m = G.C.in50, okOuter = w >= 0.82 && w <= 0.97, okInner = m >= 0.35 && m <= 0.65;
+  const verdict = !G.n ? 'No tests with enough source cycles yet.'
+    : `With ${T.minSources}+ source cycles the replay's 90% band held the actual price ${pc(w)} of the time (random walk on the same tests: ${pc(wA)}) and its 50% band ${pc(m)}. ` +
+      (okOuter && okInner ? 'Both are close to what they claim' : okOuter ? `The outer band is about right, but the middle is <b>too narrow</b>: outcomes landed in the 5–25% or 75–95% zones far more often than they should, so treat the 50% band as nearer a ${pc(m)} band` : w < 0.82 ? 'The bands look <b>too narrow</b>' : 'The bands look <b>too wide</b>') +
+      ` — but this rests on only ~${G.effN} independent years.`;
+  const one = T.bySources.find(g => g.sources === 1);
+  return `<div class="tbl-wrap compact"><table><thead><tr><th>Tests</th><th class="n" title="actual price after a year inside the 5–95% band · target 90%">In 90%</th><th class="n" title="inside the 25–75% band · target 50%">In 50%</th><th class="n" title="above the 95% / below the 5% line · target 5% / 5%">Miss ↑ / ↓</th><th class="n" title="the lowest close over the year, inside the 90% band of simulated lows · target 90%">Low in 90%</th></tr></thead>
+    <tbody>${row(`<b>Replay · ${T.minSources}+ sources</b> <span class="muted" style="font-size:11px">· ${G.n}</span>`, G.C, G.minC, true)}${row(`Random walk · same`, G.A, G.minA, false)}
+    <tr><td class="muted">Target</td><td class="n muted">90%</td><td class="n muted">50%</td><td class="n muted">5% / 5%</td><td class="n muted">90%</td></tr>
+    <tr class="mc-sub"><td colspan="5" class="muted" style="font-size:11.5px;padding-top:10px">Replay by number of source cycles · tests · years</td></tr>${groups}</tbody></table></div>
     <div style="height:170px;margin-top:10px"><canvas id="mc-cal"></canvas></div>
-    <div class="note" style="margin-top:6px">${verdict} ${T.n} tests, one every ${T.every} days, each using only earlier cycles and data known that day — but they overlap, so this is closer to <b>${T.effN} independent years</b>. Dots = where the actual price one year later landed among the simulated paths (0 = below all, 100 = above all); shaded = the 5–95 band it should land in.</div>`;
+    <div class="note" style="margin-top:6px">${verdict}${one ? ` Tests with a single source (${yr(one.from)}–${yr(one.to)}) held only ${pc(one.C.in90)}: one past cycle plus noise is not a distribution, so they are shown but left out of the headline. Today's run draws from ${T.bySources.at(-1)?.sources ?? '—'}.` : ''} One test every ${T.every} days, each using only earlier cycles and data known that day. Dots = where the actual price one year later landed among the simulated paths (0 = below all, 100 = above all; faded = single-source tests); shaded = the 5–95 band it should land in.</div>`;
 }
 
 function calChart(M, T, canvas) {
@@ -122,7 +132,7 @@ function calChart(M, T, canvas) {
     type: 'scatter',
     data: { datasets: [
       { data: T.rows.map(r => ({ x: r.t, y: r.pitA * 100 })), pointRadius: 2.5, backgroundColor: 'transparent', borderColor: C.muted, borderWidth: 1 },
-      { data: T.rows.map(r => ({ x: r.t, y: r.pitC * 100 })), pointRadius: 3, backgroundColor: C.accent, borderWidth: 0 },
+      { data: T.rows.map(r => ({ x: r.t, y: r.pitC * 100 })), pointRadius: 3, backgroundColor: T.rows.map(r => (r.analogs.length >= T.minSources ? C.accent : C.accent + '55')), borderWidth: 0 },
     ] },
     options: {
       responsive: true, maintainAspectRatio: false, animation: false, parsing: false,
